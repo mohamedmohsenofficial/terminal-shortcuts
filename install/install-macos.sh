@@ -5,46 +5,63 @@ set -e
 REPO="https://github.com/mohamedmohsenofficial/terminal-shortcuts.git"
 INSTALL_DIR="$HOME/.terminal-shortcuts"
 BIN_DIR="$HOME/.local/bin"
+COMMANDS_DIR="$INSTALL_DIR/commands/macos"
 
 echo "Installing Terminal Shortcuts..."
 
 if ! command -v git >/dev/null 2>&1; then
-    echo "Git is required."
+    echo "Error: Git is required but is not installed."
     exit 1
 fi
 
 rm -rf "$INSTALL_DIR"
 
-git clone "$REPO" "$INSTALL_DIR"
+git clone --quiet "$REPO" "$INSTALL_DIR"
 
 mkdir -p "$BIN_DIR"
 
-chmod +x "$INSTALL_DIR/macos/"*
+find "$COMMANDS_DIR" -type f -exec chmod +x {} \;
 
-for cmd in "$INSTALL_DIR/macos/"*; do
+for cmd in "$COMMANDS_DIR"/*; do
+    [ -f "$cmd" ] || continue
     ln -sf "$cmd" "$BIN_DIR/$(basename "$cmd")"
 done
 
-if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+SHELL_CONFIG="$HOME/.zshrc"
 
-    if [ -f "$HOME/.zprofile" ]; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zprofile"
-    fi
+if [ -f "$HOME/.zprofile" ]; then
+    SHELL_CONFIG="$HOME/.zprofile"
+fi
 
-    if [ -f "$HOME/.zshrc" ]; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
-    fi
-
+if ! grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' "$SHELL_CONFIG" 2>/dev/null; then
+    {
+        echo
+        echo 'export PATH="$HOME/.local/bin:$PATH"'
+    } >> "$SHELL_CONFIG"
 fi
 
 echo
-echo "Installation completed!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
-echo "Restart your terminal."
+echo "Terminal Shortcuts installed successfully."
 echo
-echo "Now you can run:"
+echo "Installed commands:"
 echo
-echo "update"
-echo "cleaner"
-echo "doctor"
-echo "repair"
+
+for cmd in "$COMMANDS_DIR"/*; do
+    [ -f "$cmd" ] || continue
+    echo "• $(basename "$cmd")"
+done
+
+echo
+echo "Installation directory:"
+echo "$INSTALL_DIR"
+echo
+echo "Command directory:"
+echo "$BIN_DIR"
+echo
+echo "Restart your terminal or run:"
+echo
+echo "source $SHELL_CONFIG"
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
