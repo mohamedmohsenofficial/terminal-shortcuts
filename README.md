@@ -2,7 +2,7 @@
 
 A collection of simple one-word terminal commands for **Linux** and **macOS**.
 
-Instead of remembering and typing long commands every time, you can run a single command such as:
+Instead of remembering long command sequences, simply type a single command.
 
 ```bash
 update
@@ -14,76 +14,64 @@ or
 cleaner
 ```
 
-Each shortcut runs one or more terminal commands to automate common tasks.
+Each command automates one or more terminal tasks to make your daily workflow faster, cleaner, and easier.
 
 ---
 
 # Why?
 
-Many terminal tasks require multiple commands.
+Many terminal tasks require running multiple commands.
 
-For example, updating your system may involve:
+For example, updating a Linux system may involve package updates, Flatpak updates, firmware updates, cache cleanup, and many other maintenance commands.
 
-```bash
-sudo dnf upgrade --refresh
-flatpak update
-```
-
-or
-
-```bash
-sudo apt update
-sudo apt upgrade
-```
-
-Instead of remembering every command, you only need to type:
+Instead of remembering and typing every command manually, simply run:
 
 ```bash
 update
 ```
 
-The goal of this project is to make everyday terminal usage faster, cleaner, and easier.
+The goal of this project is to provide clean, memorable one-word commands that simplify everyday terminal usage.
 
 ---
 
 # Features
 
-* 🚀 One-word commands
-* 🐧 Linux support
-* 🍎 macOS support
-* 📦 Easy installation
-* 🔧 Easy customization
-* 📝 Well documented
-* ❤️ Open source
+- 🚀 One-word commands
+- 🐧 Linux support
+- 🍎 macOS support
+- ⚡ One-command installation
+- 🔄 Easy updates
+- 🔧 Easy customization
+- 📦 Lightweight
+- ❤️ Open Source
 
 ---
 
 # Available Commands
 
-| Command        | Description                                  |
-| -------------- | -------------------------------------------- |
-| `update`       | Update system packages.                      |
-| `cleaner`      | Remove cache and unused packages.            |
-| `doctor`       | Check system health.                         |
-| `repair`       | Repair package issues.                       |
-| `diskinfo`     | Show disk usage information.                 |
-| `meminfo`      | Show memory usage.                           |
-| `cpuinfo`      | Show CPU information.                        |
-| `battery`      | Show battery status.                         |
-| `myip`         | Display your public IP address.              |
-| `ipinfo`       | Show network information.                    |
-| `flushdns`     | Clear the DNS cache.                         |
-| `services`     | List running services.                       |
-| `logs`         | Display recent system logs.                  |
-| `processes`    | Show the most resource-intensive processes.  |
-| `gitclean`     | Remove merged Git branches.                  |
-| `dockerclean`  | Remove unused Docker resources.              |
-| `dockerupdate` | Update Docker containers (where applicable). |
-| `speedtest`    | Run an internet speed test.                  |
-| `backup`       | Create a backup.                             |
-| `restore`      | Restore a backup.                            |
-| `shutdownnow`  | Shut down the computer immediately.          |
-| `rebootnow`    | Restart the computer immediately.            |
+| Command | Description |
+|---------|-------------|
+| `update` | Update and maintain your system. |
+| `cleaner` | Remove cache and unused files. |
+| `repair` | Repair common system issues. |
+| `diskinfo` | Show disk usage. |
+| `meminfo` | Show memory usage. |
+| `cpuinfo` | Show CPU information. |
+| `battery` | Display battery status. |
+| `myip` | Show your public IP address. |
+| `ipinfo` | Display network information. |
+| `flushdns` | Flush the DNS cache. |
+| `services` | List running services. |
+| `logs` | Show recent system logs. |
+| `processes` | Show running processes. |
+| `gitclean` | Remove merged Git branches. |
+| `dockerclean` | Remove unused Docker resources. |
+| `dockerupdate` | Update Docker containers. |
+| `speedtest` | Run an internet speed test. |
+| `backup` | Create a backup. |
+| `restore` | Restore a backup. |
+| `shutdownnow` | Shut down the computer immediately. |
+| `rebootnow` | Restart the computer immediately. |
 
 More commands will be added over time.
 
@@ -91,72 +79,115 @@ More commands will be added over time.
 
 # Installation
 
-Clone the repository:
+## Linux
 
 ```bash
-git clone https://github.com/mohamedmohsenofficial/terminal-shortcuts.git
+bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-linux.sh)
 ```
 
-Go to the project folder:
+## macOS
 
 ```bash
-cd terminal-shortcuts
+bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-macos.sh)
 ```
 
-Run the installer for your operating system.
+The installer automatically:
 
-Linux:
+- Downloads the latest version of Terminal Shortcuts
+- Installs all available commands
+- Makes every command executable
+- Creates the required symbolic links
+- Adds the commands to your PATH (if needed)
+
+No cloning.
+
+No manual setup.
+
+Just one command.
+
+---
+
+# Updating
+
+To install the latest version, simply run the installer again.
+
+## Linux
 
 ```bash
-./install/install-linux.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-linux.sh)
 ```
 
-macOS:
+## macOS
 
 ```bash
-./install/install-macos.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-macos.sh)
 ```
 
-After installation, restart your terminal or reload your shell configuration.
+---
+
+# Uninstall
+
+Linux & macOS
+
+```bash
+bash ~/.terminal-shortcuts/install/uninstall.sh
+```
+
+This removes:
+
+- Installed commands
+- Symbolic links
+- Terminal Shortcuts installation directory
 
 ---
 
 # Usage
 
-Once installed, simply type the command name.
-
-Example:
+After installation, simply type the command you want.
 
 ```bash
 update
 ```
 
-or
-
 ```bash
 cleaner
 ```
 
-or
-
 ```bash
-doctor
+repair
 ```
 
-No need to remember long command sequences anymore.
+No aliases.
+
+No long command sequences.
+
+Just one word.
 
 ---
 
 # Project Structure
 
-```
+```text
 terminal-shortcuts/
 │
 ├── commands/
+│   ├── linux/
+│   │   ├── update
+│   │   ├── cleaner
+│   │   ├── repair
+│   │   └── ...
+│   │
+│   └── macos/
+│       ├── update
+│       ├── cleaner
+│       ├── repair
+│       └── ...
+│
 ├── install/
-├── linux/
-├── macos/
-├── docs/
+│   ├── install-linux.sh
+│   ├── install-macos.sh
+│   └── uninstall.sh
+│
 ├── README.md
 └── LICENSE
 ```
@@ -165,9 +196,9 @@ terminal-shortcuts/
 
 # Customization
 
-Every shortcut is just a simple shell script.
+Every command is an independent shell script.
 
-You can modify any command or create your own shortcuts to match your workflow.
+You can edit existing commands or create your own to fit your workflow.
 
 ---
 
@@ -175,28 +206,28 @@ You can modify any command or create your own shortcuts to match your workflow.
 
 Contributions are welcome.
 
-If you have an idea for a useful shortcut or want to improve an existing one:
+If you'd like to improve Terminal Shortcuts:
 
 1. Fork the repository.
 2. Create a new branch.
 3. Make your changes.
 4. Open a Pull Request.
 
-Bug reports, feature requests, and improvements are always appreciated.
+Bug reports, feature requests, and suggestions are always appreciated.
 
 ---
 
 # Roadmap
 
-Planned improvements include:
+Planned improvements:
 
-* More built-in shortcuts
-* Better cross-platform support
-* Additional package managers
-* Interactive installer
-* Automatic updates
-* Command categories
-* Better documentation
+- More built-in commands
+- Support for additional Linux distributions
+- Interactive installer
+- Automatic updates
+- Better documentation
+- Command categories
+- Optional command selection during installation
 
 ---
 
@@ -207,9 +238,12 @@ This project is licensed under the MIT License.
 See the `LICENSE` file for more information.
 
 ---
+
 ## 💖 Support
 
-If you find this project useful, consider supporting its development. Every contribution helps improve features, maintain the project, and keep it accessible for everyone. 🌍✨
+If you find this project useful, consider supporting its development.
+
+Every contribution helps improve features, maintain the project, and keep it free for everyone.
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/mohsenofficial" target="_blank">
@@ -219,11 +253,9 @@ If you find this project useful, consider supporting its development. Every cont
 
 ---
 
+Built for my own workflow and shared with the open-source community.
 
-Built for my own needs, shared for the community. If it happens to help someone else, then it has done more than I originally intended
+If it makes your terminal experience a little faster, cleaner, or easier, then it has achieved its purpose.
 
-Built with passion, curiosity, countless hours of learning, and a deep love for open-source software.
-
-Thank you for using this project and being part of its journey. 🤟🏼😘
-
-Made with ❤️ for people who spend a lot of time in the terminal.
+Made with ❤️ for people who love the terminal.
+```
