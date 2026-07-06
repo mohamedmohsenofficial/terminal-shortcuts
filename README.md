@@ -94,7 +94,7 @@ More commands will be added over time.
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/terminal-shortcuts.git
+git clone https://github.com/mohamedmohsenofficial/terminal-shortcuts.git
 ```
 
 Go to the project folder:
