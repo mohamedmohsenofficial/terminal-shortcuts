@@ -1,8 +1,9 @@
+
 # Terminal Shortcuts
 
-A collection of simple one-word terminal commands for **Linux** and **macOS**.
+A lightweight collection of one-word terminal commands for **Linux** and **macOS**.
 
-Instead of remembering long command sequences, simply type a single command.
+Run common system tasks using memorable commands instead of long command sequences.
 
 ```bash
 update
@@ -14,23 +15,7 @@ or
 cleaner
 ```
 
-Every command automates one or more terminal tasks, making your daily workflow faster, cleaner, and easier.
-
----
-
-# Why?
-
-Many everyday terminal tasks require running multiple commands.
-
-For example, maintaining your operating system may involve updating packages, cleaning caches, removing unused files, refreshing package indexes, updating firmware, and other maintenance tasks.
-
-Instead of remembering and typing every command manually, simply run:
-
-```bash
-update
-```
-
-The goal of this project is to provide clean, memorable one-word commands that simplify everyday terminal usage while remaining easy to customize.
+Every command is an independent shell script that automates one or more terminal tasks.
 
 ---
 
@@ -42,38 +27,35 @@ The goal of this project is to provide clean, memorable one-word commands that s
 - One-command installation
 - Lightweight
 - Easy customization
-- Easy updates
+- Automatic command discovery
 - Open Source
 
 ---
 
-# Available Commands
+# Compatibility
 
-| Command | Description |
-|---------|-------------|
-| `update` | Update and maintain your system. |
-| `cleaner` | Remove cache and unused files. |
-| `repair` | Repair common system issues. |
-| `diskinfo` | Show disk usage. |
-| `meminfo` | Show memory usage. |
-| `cpuinfo` | Show CPU information. |
-| `battery` | Display battery status. |
-| `myip` | Show your public IP address. |
-| `ipinfo` | Display network information. |
-| `flushdns` | Flush the DNS cache. |
-| `services` | List running services. |
-| `logs` | Show recent system logs. |
-| `processes` | Show running processes. |
-| `gitclean` | Remove merged Git branches. |
-| `dockerclean` | Remove unused Docker resources. |
-| `dockerupdate` | Update Docker containers. |
-| `speedtest` | Run an internet speed test. |
-| `backup` | Create a backup. |
-| `restore` | Restore a backup. |
-| `shutdownnow` | Shut down the computer immediately. |
-| `rebootnow` | Restart the computer immediately. |
+- Fedora
+- Ubuntu
+- Debian
+- Arch Linux
+- Linux Mint
+- Pop!_OS
+- openSUSE
+- macOS
 
-More commands will be added over time.
+---
+
+# Why?
+
+Many terminal tasks require running multiple commands.
+
+Instead of remembering long command sequences, simply type a single command such as:
+
+```bash
+update
+```
+
+The goal of this project is to provide clean, memorable shortcuts that simplify everyday terminal usage.
 
 ---
 
@@ -93,60 +75,42 @@ bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/termin
 
 The installer automatically:
 
-- Downloads the latest version of Terminal Shortcuts
-- Installs all available commands
-- Makes every command executable
-- Creates the required symbolic links
-- Adds the commands to your PATH (if needed)
-
-No cloning.
-
-No manual setup.
-
-Just one command.
+- Downloads the latest version
+- Installs every available command
+- Makes commands executable
+- Creates symbolic links
+- Adds `~/.local/bin` to your PATH (if needed)
 
 ---
 
 # Manual Installation
 
-If you prefer not to use the automatic installer, you can install any command manually.
-
-Copy the command you want to a directory that exists in your PATH, then make it executable.
-
-Example:
+Copy the command you want into `~/.local/bin`:
 
 ```bash
-sudo cp commands/linux/<command> /usr/local/bin/<command>
-sudo chmod +x /usr/local/bin/<command>
+cp commands/linux/update ~/.local/bin/update
+chmod +x ~/.local/bin/update
 ```
 
-Replace `<command>` with the command you want to install.
+Run it:
 
-For example:
-
-```text
+```bash
 update
-cleaner
-repair
-myip
-speedtest
 ```
-
-After copying the file, simply run the command from any terminal.
 
 ---
 
 # Updating
 
-To install the latest version, simply run the installer again.
+Run the installer again.
 
-## Linux
+Linux:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-linux.sh)
 ```
 
-## macOS
+macOS:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-macos.sh)
@@ -156,23 +120,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/termin
 
 # Uninstall
 
-Linux & macOS
-
 ```bash
 bash ~/.terminal-shortcuts/install/uninstall.sh
 ```
 
-This removes:
-
-- Installed commands
-- Symbolic links
-- Terminal Shortcuts installation directory
-
 ---
 
 # Usage
-
-After installation, simply type the command you want.
 
 ```bash
 update
@@ -180,11 +134,22 @@ cleaner
 repair
 ```
 
-No aliases.
+Example:
 
-No long command sequences.
+Instead of:
 
-Just one word.
+```bash
+sudo dnf upgrade --refresh
+sudo flatpak update
+sudo dnf autoremove
+sudo dnf clean all
+```
+
+Run:
+
+```bash
+update
+```
 
 ---
 
@@ -192,38 +157,22 @@ Just one word.
 
 ```text
 terminal-shortcuts/
-│
 ├── commands/
 │   ├── linux/
-│   │   ├── update
-│   │   ├── cleaner
-│   │   ├── repair
-│   │   └── ...
-│   │
 │   └── macos/
-│       ├── update
-│       ├── cleaner
-│       ├── repair
-│       └── ...
-│
 ├── install/
 │   ├── install-linux.sh
 │   ├── install-macos.sh
 │   └── uninstall.sh
-│
 ├── README.md
 └── LICENSE
 ```
 
 ---
 
-# Customization
+# Creating a New Command
 
-Every command is an independent shell script.
-
-You can edit existing commands, modify their behavior, or create completely new shortcuts that match your own workflow.
-
-Adding a new command is as simple as placing a new executable file inside:
+1. Create a new executable file inside:
 
 ```text
 commands/linux/
@@ -235,60 +184,60 @@ or
 commands/macos/
 ```
 
-Running the installer again will automatically install every new command without modifying the installer itself.
+2. Add your shell commands.
+3. Make it executable:
+
+```bash
+chmod +x your-command
+```
+
+4. Run the installer again.
+
+The installer automatically installs every new command.
 
 ---
 
 # Contributing
 
-Contributions are always welcome.
+Contributions are welcome.
 
-Whether you want to:
+You can:
 
-- Add a new shortcut
+- Add a new command
 - Improve an existing command
-- Fix a bug
-- Improve the documentation
-- Support another Linux distribution
+- Fix bugs
+- Improve documentation
+- Support more Linux distributions
 - Improve macOS compatibility
-- Suggest a new feature
+- Suggest new ideas
 
-Feel free to open an Issue or submit a Pull Request.
-
-Every contribution, regardless of size, helps improve this project for everyone.
+Open an Issue or submit a Pull Request.
 
 ---
 
 # Roadmap
 
-Planned improvements include:
-
 - More built-in commands
-- Additional Linux distribution support
 - Interactive installer
 - Automatic self-update
-- Better documentation
-- Command categories
-- Optional command selection during installation
 - Command auto-completion
-- Optional package manager detection
-- Configuration file support
+- Configuration file
+- Package manager detection
+- Better documentation
 
 ---
 
 # License
 
-This project is licensed under the MIT License.
+Licensed under the MIT License.
 
-See the `LICENSE` file for more information.
+See the `LICENSE` file for details.
 
 ---
 
-## Support
+# Support
 
-If you find this project useful, consider supporting its development.
-
-Every contribution helps improve new features, maintain the project, and keep it free and open source for everyone.
+If you find this project useful, consider supporting it.
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/mohsenofficial" target="_blank">
@@ -298,8 +247,14 @@ Every contribution helps improve new features, maintain the project, and keep it
 
 ---
 
-Built for my own workflow and shared with the open-source community.
+# Acknowledgements
 
-If this project saves you time or simplifies your daily terminal workflow, then it has achieved its purpose.
+Inspired by the Unix philosophy:
 
-Built with passion for developers, power users, and terminal enthusiasts.
+> Do one thing and do it well.
+
+Thanks to the open-source community for the tools and ideas that made this project possible.
+
+---
+
+Made with ❤️ for the open-source community.
