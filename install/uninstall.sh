@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
+set -e
+
 echo "Removing Terminal Shortcuts..."
 
-rm -f ~/.local/bin/update
-rm -f ~/.local/bin/cleaner
-rm -f ~/.local/bin/doctor
-rm -f ~/.local/bin/repair
+rm -f ~/.local/bin/*
 
-echo "Done."
+rm -rf ~/.terminal-shortcuts
+
+echo
+echo "Terminal Shortcuts has been removed."
