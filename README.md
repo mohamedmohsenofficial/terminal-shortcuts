@@ -157,13 +157,25 @@ update
 terminal-shortcuts/
 ├── commands/
 │   ├── linux/
+│   │   ├── update
+│   │   ├── cleaner
+│   │   ├── repair
+│   │   └── ...
+│   │
 │   └── macos/
+│       ├── update
+│       ├── cleaner
+│       ├── repair
+│       └── ...
+│
 ├── install/
 │   ├── install-linux.sh
 │   ├── install-macos.sh
 │   └── uninstall.sh
+│
 ├── README.md
-└── LICENSE
+├── LICENSE
+└── .gitignore
 ```
 
 ---
@@ -233,9 +245,11 @@ See the `LICENSE` file for details.
 
 ---
 
-# Support
+## Support
 
-If you find this project useful, consider supporting it.
+If you find this project useful, consider supporting its development.
+
+Every contribution helps improve new features, maintain the project, and keep it free and open source for everyone.
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/mohsenofficial" target="_blank">
@@ -245,14 +259,8 @@ If you find this project useful, consider supporting it.
 
 ---
 
-# Acknowledgements
+Built for my own workflow and shared with the open-source community.
 
-Inspired by the Unix philosophy:
+If this project saves you time or simplifies your daily terminal workflow, then it has achieved its purpose.
 
-> Do one thing and do it well.
-
-Thanks to the open-source community for the tools and ideas that made this project possible.
-
----
-
-Made with ❤️ for the open-source community.
+Built with passion for developers, power users, and terminal enthusiasts.
