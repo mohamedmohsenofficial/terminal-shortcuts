@@ -106,7 +106,40 @@ No manual setup.
 Just one command.
 
 ---
+# Manual Installation
 
+If you prefer not to use the automatic installer, you can install commands manually.
+
+Copy any command to a directory that exists in your PATH.
+
+Example:
+
+```bash
+sudo cp commands/linux/update /usr/local/bin/update
+sudo chmod +x /usr/local/bin/update
+```
+
+You can now run:
+
+```bash
+update
+```
+
+The same steps apply to any other command.
+
+Example:
+
+```bash
+sudo cp commands/linux/cleaner /usr/local/bin/cleaner
+sudo chmod +x /usr/local/bin/cleaner
+```
+
+Then simply run:
+
+```bash
+cleaner
+```
+---
 # Updating
 
 To install the latest version, simply run the installer again.
@@ -236,6 +269,22 @@ Planned improvements:
 This project is licensed under the MIT License.
 
 See the `LICENSE` file for more information.
+
+# Contributing
+
+Contributions are welcome and greatly appreciated.
+
+Whether you'd like to:
+
+- Add a new shortcut
+- Improve an existing command
+- Fix a bug
+- Improve the documentation
+- Suggest a new feature
+
+Feel free to open an Issue or submit a Pull Request.
+
+Every contribution, no matter how small, helps make this project better for everyone.
 
 ---
 
