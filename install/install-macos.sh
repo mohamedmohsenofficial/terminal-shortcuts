@@ -2,18 +2,49 @@
 
 set -e
 
+REPO="https://github.com/mohamedmohsenofficial/terminal-shortcuts.git"
+INSTALL_DIR="$HOME/.terminal-shortcuts"
+BIN_DIR="$HOME/.local/bin"
+
 echo "Installing Terminal Shortcuts..."
 
-mkdir -p ~/.local/bin
+if ! command -v git >/dev/null 2>&1; then
+    echo "Git is required."
+    exit 1
+fi
 
-chmod +x ../macos/*
+rm -rf "$INSTALL_DIR"
 
-ln -sf "$(pwd)/../macos/update" ~/.local/bin/update
-ln -sf "$(pwd)/../macos/cleaner" ~/.local/bin/cleaner
-ln -sf "$(pwd)/../macos/doctor" ~/.local/bin/doctor
-ln -sf "$(pwd)/../macos/repair" ~/.local/bin/repair
+git clone "$REPO" "$INSTALL_DIR"
 
-echo ""
-echo "Installation completed."
-echo ""
+mkdir -p "$BIN_DIR"
+
+chmod +x "$INSTALL_DIR/macos/"*
+
+for cmd in "$INSTALL_DIR/macos/"*; do
+    ln -sf "$cmd" "$BIN_DIR/$(basename "$cmd")"
+done
+
+if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+
+    if [ -f "$HOME/.zprofile" ]; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zprofile"
+    fi
+
+    if [ -f "$HOME/.zshrc" ]; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+    fi
+
+fi
+
+echo
+echo "Installation completed!"
+echo
 echo "Restart your terminal."
+echo
+echo "Now you can run:"
+echo
+echo "update"
+echo "cleaner"
+echo "doctor"
+echo "repair"
