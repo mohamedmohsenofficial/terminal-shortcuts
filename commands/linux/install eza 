@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# 1. Installation (Will ask for password once at the beginning)
+echo "1. Starting tool installation... If prompted, enter your password"
+
+# Detect package manager and install tools
+if command -v pacman &> /dev/null; then
+    sudo pacman -S --needed starship eza git curl fzf gnupg2
+elif command -v dnf &> /dev/null; then
+    sudo dnf install starship eza git curl fzf gnupg2 -y
+elif command -v apt &> /dev/null; then
+    sudo apt install starship eza git curl fzf gnupg2 -y
+else
+    echo "Unsupported package manager. Please install tools manually."
+    exit 1
+fi
+
+# Verify installation success
+if [ $? -ne 0 ]; then
+    echo "An error occurred during installation. Stopping."
+    exit 1
+fi
+
+echo "2. Basic programs installed."
+echo "3. Configuring activation settings (Starship, FZF, EZA aliases)..."
+
+# ----------------------------------------------------
+# Define settings to be written
+# ----------------------------------------------------
+
+# --- EZA Shortcuts ---
+EZA_ALIASES="
+# EZA Aliases (ls -> eza)
+alias ls='eza --icons'
+alias ll='eza -l --icons'
+alias la='eza -la --icons'
+alias l='eza -l --icons'
+"
+
+# --- Enable FZF ---
+FZF_BASH_LINE='[ -f /usr/share/fzf/shell.bash ] && source /usr/share/fzf/shell.bash'
+FZF_ZSH_LINE='[ -f /usr/share/fzf/shell.zsh ] && source /usr/share/fzf/shell.zsh'
+
+# --- Enable Starship ---
+STARSHIP_BASH_LINE='eval "$(starship init bash)"'
+STARSHIP_ZSH_LINE='eval "$(starship init zsh)"'
+
+# ----------------------------------------------------
+# Execution on files
+# ----------------------------------------------------
+
+# Define file locations
+BASH_CONFIG="$HOME/.bashrc"
+ZSH_CONFIG="$HOME/.zshrc"
+
+# --- Write settings to .bashrc if it exists ---
+if [ -f "$BASH_CONFIG" ]; then
+    echo "... Configuring file $BASH_CONFIG"
+    
+    # Add EZA if not present
+    if ! grep -q "# EZA Aliases" "$BASH_CONFIG"; then
+        echo "$EZA_ALIASES" >> "$BASH_CONFIG"
+    fi
+    # Add FZF if not present
+    if ! grep -q "fzf/shell.bash" "$BASH_CONFIG"; then
+        echo "$FZF_BASH_LINE" >> "$BASH_CONFIG"
+    fi
+    # Add Starship if not present
+    if ! grep -q "starship init bash" "$BASH_CONFIG"; then
+        echo "$STARSHIP_BASH_LINE" >> "$BASH_CONFIG"
+    fi
+fi
+
+# --- Write settings to .zshrc if it exists ---
+if [ -f "$ZSH_CONFIG" ]; then
+    echo "... Configuring file $ZSH_CONFIG"
+    
+    # Add EZA if not present
+    if ! grep -q "# EZA Aliases" "$ZSH_CONFIG"; then
+        echo "$EZA_ALIASES" >> "$ZSH_CONFIG"
+    fi
+    # Add FZF if not present
+    if ! grep -q "fzf/shell.zsh" "$ZSH_CONFIG"; then
+        echo "$FZF_ZSH_LINE" >> "$ZSH_CONFIG"
+    fi
+    # Add Starship if not present
+    if ! grep -q "starship init zsh" "$ZSH_CONFIG"; then
+        echo "$STARSHIP_ZSH_LINE" >> "$ZSH_CONFIG"
+    fi
+fi
+
+echo "4. All done!"
+echo "Important: Close this Terminal and open a new one to see the changes."

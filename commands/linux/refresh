@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Detect desktop environment
+DE=$(echo "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')
+
+# Execute the appropriate refresh command.
+case "$DE" in
+  *cinnamon*)
+    nemo-desktop --quit && nohup nemo-desktop &>/dev/null &
+    ;;
+  *xfce*)
+    xfdesktop --reload
+    ;;
+  *mate*)
+    caja -q && caja --no-default-window &>/dev/null &
+    ;;
+  *)
+    notify-send "Refresh" "I can't find a suitable command for the desktop environment.: $DE"
+    ;;
+esac

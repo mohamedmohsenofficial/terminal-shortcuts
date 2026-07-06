@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# =================================
+# Linux System Health Check (Universal)
+# =================================
+
+# Must be run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "Please run this script as root (use sudo)."
+  exit 1
+fi
+
+REPORT_FILE="linux_health_report.txt"
+
+# Function to write a clean section header and log to file
+log_header() {
+    echo -e "\n" | tee -a "$REPORT_FILE"
+    echo "=================================================" | tee -a "$REPORT_FILE"
+    echo " $1" | tee -a "$REPORT_FILE"
+    echo "=================================================" | tee -a "$REPORT_FILE"
+}
+
+echo "STARTING LINUX HEALTH CHECK" | tee "$REPORT_FILE"
+echo "This script will check kernel errors, services, disk health, and list hardware."
+echo "A full report will be saved to '$REPORT_FILE' in this directory."
+
+# --- 1. Check for Hardware / Kernel Errors (dmesg) ---
+log_header "[1/5] Kernel & Driver Messages (Errors & Warnings)"
+echo "Searching for hardware, driver, or filesystem errors in the kernel log..."
+dmesg -T -l err,warn | tee -a "$REPORT_FILE"
+if ! dmesg -T -l err,warn | grep -q "."; then
+    echo "No kernel errors or warnings found." | tee -a "$REPORT_FILE"
+fi
+
+# --- 2. Check Systemd Service Failures ---
+log_header "[2/5] Failed System Services (systemd)"
+echo "Checking for any system services that have failed to start..."
+systemctl --failed --no-pager | tee -a "$REPORT_FILE"
+if ! systemctl --failed | grep -q "failed"; then
+    echo "All services are running correctly." | tee -a "$REPORT_FILE"
+fi
+
+# --- 3. Check Disk Health (SMART) ---
+log_header "[3/5] Disk Health (SMART)"
+if ! command -v smartctl &> /dev/null; then
+    # Detect package manager to give correct installation advice
+    if command -v pacman &> /dev/null; then
+        PKG_MANAGER_CMD="sudo pacman -S smartmontools"
+    elif command -v dnf &> /dev/null; then
+        PKG_MANAGER_CMD="sudo dnf install smartmontools"
+    elif command -v apt &> /dev/null; then
+        PKG_MANAGER_CMD="sudo apt install smartmontools"
+    else
+        PKG_MANAGER_CMD="Install smartmontools using your distribution's package manager"
+    fi
+    echo "'smartmontools' not found. Please install it ('$PKG_MANAGER_CMD') to check disk health." | tee -a "$REPORT_FILE"
+else
+    for disk in $(ls /dev/[sv]d[a-z] /dev/nvme[0-9]n[0-9] 2>/dev/null); do
+        echo -e "\n--- Checking $disk ---" | tee -a "$REPORT_FILE"
+        HEALTH_RESULT=$(smartctl -H "$disk" | grep "overall-health" | awk '{print $NF}')
+        if [ "$HEALTH_RESULT" == "PASSED" ]; then
+            echo "$disk: Overall health test PASSED." | tee -a "$REPORT_FILE"
+        elif [ "$HEALTH_RESULT" == "FAILED!" ]; then
+            echo "$disk: Overall health test FAILED!" | tee -a "$REPORT_FILE"
+            smartctl -A "$disk" | grep "ATTRIBUTE_NAME" -A 20 | tee -a "$REPORT_FILE"
+        else
+            echo "$disk: Could not determine SMART health." | tee -a "$REPORT_FILE"
+        fi
+    done
+fi
+
+# --- 4. List Hardware (lshw) ---
+log_header "[4/5] Hardware Summary Table"
+if ! command -v lshw &> /dev/null; then
+    # Detect package manager to give correct installation advice
+    if command -v pacman &> /dev/null; then
+        PKG_MANAGER_CMD="sudo pacman -S lshw"
+    elif command -v dnf &> /dev/null; then
+        PKG_MANAGER_CMD="sudo dnf install lshw"
+    elif command -v apt &> /dev/null; then
+        PKG_MANAGER_CMD="sudo apt install lshw"
+    else
+        PKG_MANAGER_CMD="Install lshw using your distribution's package manager"
+    fi
+    echo "'lshw' not found. Please install it ('$PKG_MANAGER_CMD') for a full hardware list." | tee -a "$REPORT_FILE"
+else
+    echo "Generating hardware summary table..."
+    lshw -short | tee -a "$REPORT_FILE"
+fi
+
+# --- 5. List PCI & USB Devices (For manual verification) ---
+log_header "[5/5] Device IDs (For Fake/Real Check)"
+echo "Use these IDs to check hardware authenticity online." | tee -a "$REPORT_FILE"
+
+echo -e "\n--- PCI Devices (GPU, Network, etc.) ---" | tee -a "$REPORT_FILE"
+lspci -nn | tee -a "$REPORT_FILE"
+
+echo -e "\n--- USB Devices ---" | tee -a "$REPORT_FILE"
+lsusb | tee -a "$REPORT_FILE"
+
+# --- FINAL ---
+log_header "--- CHECK COMPLETE ---"
+echo "Review the output above for any warnings." | tee -a "$REPORT_FILE"
+echo "A full report has been saved to '$REPORT_FILE'." | tee -a "$REPORT_FILE"

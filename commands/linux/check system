@@ -1,0 +1,86 @@
+#!/bin/bash
+echo "Scanning the entire system... Please wait"
+echo "--------------------------------------------"
+
+# Define function to display status
+check_status() {
+  if [ $1 -eq 0 ]; then
+    echo "OK"
+  else
+    echo "Problem detected"
+  fi
+}
+
+# 1. Check for updates
+echo -n "Checking updates and packages: "
+if command -v apt &> /dev/null; then
+    sudo apt update -qq > /dev/null 2>&1
+elif command -v dnf &> /dev/null; then
+    sudo dnf check-update -q > /dev/null 2>&1
+elif command -v pacman &> /dev/null; then
+    sudo pacman -Sy --quiet > /dev/null 2>&1
+fi
+check_status $?
+
+# 2. Check for broken packages
+echo -n "Checking broken packages: "
+if command -v apt &> /dev/null; then
+    sudo dpkg --configure -a > /dev/null 2>&1
+    sudo apt -f install -y > /dev/null 2>&1
+elif command -v dnf &> /dev/null; then
+    sudo dnf repoquery --unsatisfied > /dev/null 2>&1
+fi
+check_status $?
+
+# 3. Check system integrity (fsck)
+echo -n "Checking system integrity (fsck): "
+sudo touch /forcefsck 2>/dev/null
+check_status $?
+
+# 4. Check network card and connection
+echo -n "Checking Internet (ping 8.8.8.8): "
+ping -c 1 8.8.8.8 > /dev/null 2>&1
+check_status $?
+
+# 5. Check storage space
+echo -n "Checking storage space: "
+df -h | grep '/$' | awk '{print $5" used"}'
+
+# 6. Check device temperature
+echo -n "Checking CPU temperature: "
+if command -v sensors > /dev/null; then
+  sensors | grep 'Package id 0' | awk '{print $4}'
+else
+  echo "Warning: sensors tool not installed. Install it using your package manager (e.g., lm-sensors)"
+fi
+
+# 7. Check important services (systemd)
+echo -n "Checking service status (systemctl): "
+sudo systemctl --failed | grep -q failed
+if [ $? -eq 0 ]; then
+  echo "Some services have failed"
+  sudo systemctl --failed
+else
+  echo "All services are running correctly"
+fi
+
+# 8. Check hard drive status (SMART)
+echo -n "Checking hard drive status (SMART): "
+if command -v smartctl > /dev/null; then
+  sudo smartctl -H /dev/sda | grep "SMART overall-health"
+else
+  echo "Warning: smartmontools not installed. Install it using your package manager"
+fi
+
+# 9. Check Swap status
+echo -n "Checking Swap: "
+swap_status=$(swapon --show --noheadings | awk '{print $1}')
+if [ -z "$swap_status" ]; then
+  echo "No active Swap found"
+else
+  echo "Swap is active"
+  echo "Source: $swap_status"
+  free -h | awk '/Swap/ {print "Used: "$3" of "$2}'
+fi
+echo "--------------------------------------------"
+echo "Scan complete, everything has been reviewed!"

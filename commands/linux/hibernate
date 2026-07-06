@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Ready script to enable Hibernate directly without intervention
+
+# Define the full path of the script
+SCRIPT_PATH="/home/$USER/Documents/hibernate.sh"
+
+# Ensure the script runs with root privileges
+if [[ $EUID -ne 0 ]]; then
+    echo "Running the script with sudo privileges..."
+    sudo bash "$SCRIPT_PATH"
+    exit
+fi
+
+# Execute Hibernate
+echo "Putting the system into hibernation mode (Hibernate)..."
+sleep 1
+systemctl hibernate

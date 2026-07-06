@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Simple script to display system uptime in the system tray
+
+while true; do
+  # Get uptime in a friendly format
+  uptime_text=$(uptime -p | sed 's/up //')
+
+  # Display it in the tray icon using yad
+  yad --notification --text="$uptime_text" --command="" --kill-parent
+
+  # Update every 60 seconds
+  sleep 60
+done

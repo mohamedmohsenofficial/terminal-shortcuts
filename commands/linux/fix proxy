@@ -1,0 +1,32 @@
+#!/bin/bash
+
+echo "Waiting a few seconds to restart the network to clear any hangs..."
+sudo nmcli networking off
+sleep 1
+sudo nmcli networking on
+sleep 4
+
+# Extract the IP of the mobile connection (Gateway)
+GATEWAY=$(ip route show default | awk '/default/ {print $3}' | head -n 1)
+
+if [ -z "$GATEWAY" ]; then
+    echo "No network connected! Make sure you are connected via cable and have enabled 'USB Tethering' from your mobile."
+    exit 1
+fi
+
+echo "Mobile detected! The real IP is: $GATEWAY"
+
+# Configure proxy on the system
+echo "Injecting proxy settings into the system..."
+gsettings set org.gnome.system.proxy mode 'manual'
+gsettings set org.gnome.system.proxy.http host "$GATEWAY"
+gsettings set org.gnome.system.proxy.http port 8080
+gsettings set org.gnome.system.proxy.https host "$GATEWAY"
+gsettings set org.gnome.system.proxy.https port 8080
+gsettings set org.gnome.system.proxy ignore-hosts "['localhost', '127.0.0.0/8', '::1']"
+
+echo "Done! Open your browser and try the internet now."
+echo "------------------------------------------------"
+echo "Note: If you are using terminal programs and want them to use the internet, copy these two lines and run them:"
+echo "export http_proxy=\"http://$GATEWAY:8080/\""
+echo "export https_proxy=\"http://$GATEWAY:8080/\""
