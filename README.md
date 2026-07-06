@@ -39,8 +39,6 @@ Every command is an independent shell script that automates one or more terminal
 - Debian
 - Arch Linux
 - Linux Mint
-- Pop!_OS
-- openSUSE
 - macOS
 
 ---
