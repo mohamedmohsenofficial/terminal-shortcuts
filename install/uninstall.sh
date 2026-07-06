@@ -3,7 +3,7 @@
 set -euo pipefail
 
 INSTALL_DIR="$HOME/.terminal-shortcuts"
-BIN_DIR="$HOME/.local/bin"
+BIN_DIR="/usr/local/bin"
 
 echo "Removing Terminal Shortcuts..."
 echo
@@ -18,7 +18,14 @@ if [ ! -d "$INSTALL_DIR" ]; then
 fi
 
 # --------------------------------------------------
-# Remove symbolic links
+# Request administrator privileges
+# --------------------------------------------------
+
+echo "Administrator privileges are required."
+sudo -v
+
+# --------------------------------------------------
+# Remove installed commands
 # --------------------------------------------------
 
 for PLATFORM in linux macos
@@ -29,7 +36,7 @@ do
 
         find "$COMMANDS_DIR" -maxdepth 1 -type f | while read -r cmd
         do
-            rm -f "$BIN_DIR/$(basename "$cmd")"
+            sudo rm -f "$BIN_DIR/$(basename "$cmd")"
         done
 
     fi
@@ -53,7 +60,6 @@ echo
 echo "Removed:"
 echo
 echo "• Installed commands"
-echo "• Symbolic links"
 echo "• Installation directory"
 echo
 echo "Command directory:"
