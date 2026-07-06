@@ -1,86 +1,711 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 echo "Scanning the entire system... Please wait"
 echo "--------------------------------------------"
 
-# Define function to display status
+# ==================================================
+# Status Helper
+# ==================================================
+
 check_status() {
-  if [ $1 -eq 0 ]; then
-    echo "OK"
-  else
-    echo "Problem detected"
-  fi
+    if [ "$1" -eq 0 ]; then
+        echo "PASS"
+    else
+        echo "FAIL"
+    fi
 }
 
-# 1. Check for updates
-echo -n "Checking updates and packages: "
-if command -v apt &> /dev/null; then
-    sudo apt update -qq > /dev/null 2>&1
-elif command -v dnf &> /dev/null; then
-    sudo dnf check-update -q > /dev/null 2>&1
-elif command -v pacman &> /dev/null; then
-    sudo pacman -Sy --quiet > /dev/null 2>&1
+BROKEN_PKGS="NO"
+FAILED_SERVICES="NO"
+FILESYSTEM_STATUS="PASS"
+INTERNET_STATUS="FAIL"
+DISK_STATUS="UNKNOWN"
+LSHW_STATUS="OK"
+ACPI_ERRORS="NO"
+BROADCOM_DRIVER="NO"
+
+# ==================================================
+# Detect Package Manager
+# ==================================================
+
+PKG=""
+
+if command -v apt >/dev/null 2>&1; then
+    PKG="apt"
+
+elif command -v dnf >/dev/null 2>&1; then
+    PKG="dnf"
+
+elif command -v pacman >/dev/null 2>&1; then
+    PKG="pacman"
+
 fi
+
+# ==================================================
+# 1. Updates
+# ==================================================
+
+echo -n "Checking package repositories: "
+
+case "$PKG" in
+
+apt)
+    sudo apt update -qq >/dev/null 2>&1
+    ;;
+
+dnf)
+    sudo dnf check-update -q >/dev/null 2>&1 || true
+    ;;
+
+pacman)
+    sudo pacman -Sy --noconfirm >/dev/null 2>&1
+    ;;
+
+*)
+    echo "Unsupported package manager."
+    exit 1
+    ;;
+
+esac
+
 check_status $?
 
-# 2. Check for broken packages
+# ==================================================
+# 2. Broken Packages
+# ==================================================
+
 echo -n "Checking broken packages: "
-if command -v apt &> /dev/null; then
-    sudo dpkg --configure -a > /dev/null 2>&1
-    sudo apt -f install -y > /dev/null 2>&1
-elif command -v dnf &> /dev/null; then
-    sudo dnf repoquery --unsatisfied > /dev/null 2>&1
-fi
-check_status $?
 
-# 3. Check system integrity (fsck)
-echo -n "Checking system integrity (fsck): "
-sudo touch /forcefsck 2>/dev/null
-check_status $?
+case "$PKG" in
 
-# 4. Check network card and connection
-echo -n "Checking Internet (ping 8.8.8.8): "
-ping -c 1 8.8.8.8 > /dev/null 2>&1
-check_status $?
+apt)
 
-# 5. Check storage space
-echo -n "Checking storage space: "
-df -h | grep '/$' | awk '{print $5" used"}'
+    if sudo dpkg --audit | grep -q .; then
+        BROKEN_PKGS="YES"
+        echo "Problem detected"
+    else
+        echo "PASS"
+    fi
+    ;;
 
-# 6. Check device temperature
-echo -n "Checking CPU temperature: "
-if command -v sensors > /dev/null; then
-  sensors | grep 'Package id 0' | awk '{print $4}'
+dnf)
+
+    if sudo dnf repoquery --unsatisfied | grep -q .; then
+        BROKEN_PKGS="YES"
+        echo "Problem detected"
+    else
+        echo "PASS"
+    fi
+    ;;
+
+pacman)
+
+    if sudo pacman -Qk 2>/dev/null | grep -q warning; then
+        BROKEN_PKGS="YES"
+        echo "Problem detected"
+    else
+        echo "PASS"
+    fi
+    ;;
+
+esac
+
+echo
+
+# ==================================================
+# 3. Filesystem
+# ==================================================
+
+echo -n "Checking filesystem: "
+
+ROOT_DEVICE=$(findmnt -n -o SOURCE /)
+
+if sudo fsck -N "$ROOT_DEVICE" >/dev/null 2>&1; then
+    FILESYSTEM_STATUS="PASS"
+    echo "PASS"
 else
-  echo "Warning: sensors tool not installed. Install it using your package manager (e.g., lm-sensors)"
+    FILESYSTEM_STATUS="FAIL"
+    echo "FAIL"
 fi
 
-# 7. Check important services (systemd)
-echo -n "Checking service status (systemctl): "
-sudo systemctl --failed | grep -q failed
-if [ $? -eq 0 ]; then
-  echo "Some services have failed"
-  sudo systemctl --failed
+echo
+
+# ==================================================
+# 4. Internet
+# ==================================================
+
+echo -n "Checking Internet: "
+
+if ping -c1 -W2 8.8.8.8 >/dev/null 2>&1; then
+    INTERNET_STATUS="PASS"
+    echo "PASS"
 else
-  echo "All services are running correctly"
+    INTERNET_STATUS="FAIL"
+    echo "FAIL"
 fi
 
-# 8. Check hard drive status (SMART)
-echo -n "Checking hard drive status (SMART): "
-if command -v smartctl > /dev/null; then
-  sudo smartctl -H /dev/sda | grep "SMART overall-health"
+echo
+
+# ==================================================
+# 5. Disk Usage
+# ==================================================
+
+echo "Storage Usage"
+
+df -h / | awk 'NR==2{
+printf "Used: %s / %s (%s)\n",$3,$2,$5
+}'
+
+echo
+# ==================================================
+# 6. CPU Temperature
+# ==================================================
+
+echo "CPU Temperature"
+
+if command -v sensors >/dev/null 2>&1; then
+
+    TEMP=$(sensors 2>/dev/null | awk '
+        /Package id 0:/ {gsub("\\+","",$4); print $4; exit}
+        /Tctl:/ {gsub("\\+","",$2); print $2; exit}
+        /temp1:/ {gsub("\\+","",$2); print $2; exit}
+    ')
+
+    if [ -n "$TEMP" ]; then
+        echo "$TEMP"
+    else
+        echo "Unable to detect CPU temperature."
+    fi
+
 else
-  echo "Warning: smartmontools not installed. Install it using your package manager"
+
+    echo "lm-sensors is not installed."
+
 fi
 
-# 9. Check Swap status
-echo -n "Checking Swap: "
-swap_status=$(swapon --show --noheadings | awk '{print $1}')
-if [ -z "$swap_status" ]; then
-  echo "No active Swap found"
+echo
+
+# ==================================================
+# 7. Failed Services
+# ==================================================
+
+echo "Checking failed system services"
+
+FAILED_LIST=$(systemctl --failed --no-legend 2>/dev/null | \
+grep -v "snapd" | \
+grep -v "var-lib-snapd" || true)
+
+if [ -n "$FAILED_LIST" ]; then
+
+    FAILED_SERVICES="YES"
+
+    echo
+    echo "$FAILED_LIST"
+
 else
-  echo "Swap is active"
-  echo "Source: $swap_status"
-  free -h | awk '/Swap/ {print "Used: "$3" of "$2}'
+
+    echo "PASS"
+
 fi
-echo "--------------------------------------------"
-echo "Scan complete, everything has been reviewed!"
+
+echo
+
+# ==================================================
+# 8. Swap
+# ==================================================
+
+echo "Swap Status"
+
+if swapon --show --noheadings | grep -q .; then
+
+    SOURCE=$(swapon --show --noheadings | awk '{print $1}')
+    SIZE=$(free -h | awk '/Swap:/ {print $2}')
+    USED=$(free -h | awk '/Swap:/ {print $3}')
+
+    echo "Status : ACTIVE"
+    echo "Source : $SOURCE"
+    echo "Usage  : $USED / $SIZE"
+
+else
+
+    echo "No active swap."
+
+fi
+
+echo
+
+# ==================================================
+# 9. SMART Disk Health
+# ==================================================
+
+echo -n "Checking SMART health: "
+
+ROOT_DISK=$(lsblk -no PKNAME "$ROOT_DEVICE" 2>/dev/null | head -1)
+
+if command -v smartctl >/dev/null 2>&1; then
+
+    if [ -n "$ROOT_DISK" ]; then
+
+        if sudo smartctl -H "/dev/$ROOT_DISK" | grep -q PASSED; then
+
+            DISK_STATUS="PASS"
+            echo "PASS"
+
+        else
+
+            DISK_STATUS="FAIL"
+            echo "FAIL"
+
+        fi
+
+    else
+
+        echo "Unable to detect system disk."
+
+    fi
+
+else
+
+    echo "smartmontools not installed."
+
+fi
+
+echo
+
+# ==================================================
+# 10. Optional Tools
+# ==================================================
+
+if ! command -v lshw >/dev/null 2>&1; then
+    LSHW_STATUS="MISSING"
+fi
+
+if dmesg | grep -qi "ACPI.*Error"; then
+    ACPI_ERRORS="YES"
+fi
+
+if lsmod | grep -q "^wl"; then
+    BROADCOM_DRIVER="YES"
+fi
+
+echo
+# ==================================================
+# 6. CPU Temperature
+# ==================================================
+
+echo "CPU Temperature"
+
+if command -v sensors >/dev/null 2>&1; then
+
+    TEMP=$(sensors 2>/dev/null | awk '
+        /Package id 0:/ {gsub("\\+","",$4); print $4; exit}
+        /Tctl:/ {gsub("\\+","",$2); print $2; exit}
+        /temp1:/ {gsub("\\+","",$2); print $2; exit}
+    ')
+
+    if [ -n "$TEMP" ]; then
+        echo "$TEMP"
+    else
+        echo "Unable to detect CPU temperature."
+    fi
+
+else
+
+    echo "lm-sensors is not installed."
+
+fi
+
+echo
+
+# ==================================================
+# 7. Failed Services
+# ==================================================
+
+echo "Checking failed system services"
+
+FAILED_LIST=$(systemctl --failed --no-legend 2>/dev/null | \
+grep -v "snapd" | \
+grep -v "var-lib-snapd" || true)
+
+if [ -n "$FAILED_LIST" ]; then
+
+    FAILED_SERVICES="YES"
+
+    echo
+    echo "$FAILED_LIST"
+
+else
+
+    echo "PASS"
+
+fi
+
+echo
+
+# ==================================================
+# 8. Swap
+# ==================================================
+
+echo "Swap Status"
+
+if swapon --show --noheadings | grep -q .; then
+
+    SOURCE=$(swapon --show --noheadings | awk '{print $1}')
+    SIZE=$(free -h | awk '/Swap:/ {print $2}')
+    USED=$(free -h | awk '/Swap:/ {print $3}')
+
+    echo "Status : ACTIVE"
+    echo "Source : $SOURCE"
+    echo "Usage  : $USED / $SIZE"
+
+else
+
+    echo "No active swap."
+
+fi
+
+echo
+
+# ==================================================
+# 9. SMART Disk Health
+# ==================================================
+
+echo -n "Checking SMART health: "
+
+ROOT_DISK=$(lsblk -no PKNAME "$ROOT_DEVICE" 2>/dev/null | head -1)
+
+if command -v smartctl >/dev/null 2>&1; then
+
+    if [ -n "$ROOT_DISK" ]; then
+
+        if sudo smartctl -H "/dev/$ROOT_DISK" | grep -q PASSED; then
+
+            DISK_STATUS="PASS"
+            echo "PASS"
+
+        else
+
+            DISK_STATUS="FAIL"
+            echo "FAIL"
+
+        fi
+
+    else
+
+        echo "Unable to detect system disk."
+
+    fi
+
+else
+
+    echo "smartmontools not installed."
+
+fi
+
+echo
+
+# ==================================================
+# 10. Optional Tools
+# ==================================================
+
+if ! command -v lshw >/dev/null 2>&1; then
+    LSHW_STATUS="MISSING"
+fi
+
+if dmesg | grep -qi "ACPI.*Error"; then
+    ACPI_ERRORS="YES"
+fi
+
+if lsmod | grep -q "^wl"; then
+    BROADCOM_DRIVER="YES"
+fi
+
+echo
+# ==================================================
+# Memory Usage
+# ==================================================
+
+echo "Memory Usage"
+
+free -h | awk '
+/Mem:/{
+printf "RAM  : %s / %s (%.0f%%)\n",$3,$2,$3/$2*100
+}
+/Swap:/{
+printf "Swap : %s / %s\n",$3,$2
+}'
+
+echo
+
+# ==================================================
+# CPU Load
+# ==================================================
+
+echo "CPU Load"
+
+LOAD=$(awk '{print $1}' /proc/loadavg)
+
+CORES=$(nproc)
+
+echo "Load Average : $LOAD"
+
+echo "CPU Cores    : $CORES"
+
+echo
+
+# ==================================================
+# System Uptime
+# ==================================================
+
+echo "System Uptime"
+
+uptime -p
+
+echo
+
+# ==================================================
+# Battery
+# ==================================================
+
+echo "Battery Status"
+
+if command -v upower >/dev/null 2>&1; then
+
+BATTERY=$(upower -e | grep battery | head -1)
+
+if [ -n "$BATTERY" ]; then
+
+upower -i "$BATTERY" | awk -F': *' '
+
+/state/{
+print "State      : "$2
+}
+
+/percentage/{
+print "Charge     : "$2
+}
+
+/time to empty/{
+print "Remaining  : "$2
+}
+
+/time to full/{
+print "Remaining  : "$2
+}
+
+'
+
+else
+
+echo "Desktop PC (No Battery)"
+
+fi
+
+else
+
+echo "upower not installed."
+
+fi
+
+echo
+# ==================================================
+# Network Information
+# ==================================================
+
+echo "Network Information"
+
+IP=$(hostname -I | awk '{print $1}')
+
+echo "Local IP : $IP"
+
+PUBLIC_IP=$(curl -fs https://api.ipify.org 2>/dev/null || echo "Unavailable")
+
+echo "Public IP: $PUBLIC_IP"
+
+echo
+
+echo "DNS Servers"
+
+grep nameserver /etc/resolv.conf
+
+echo
+
+echo "Default Gateway"
+
+ip route | awk '/default/ {print $3}'
+
+echo
+# ==================================================
+# Disk Information
+# ==================================================
+
+echo "Disk Information"
+
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT
+
+echo
+
+ROOT_DISK=$(lsblk -ndo PKNAME "$(findmnt -n -o SOURCE /)" | head -1)
+
+echo "System Disk : /dev/$ROOT_DISK"
+
+echo
+# ==================================================
+# SSD / NVMe Lifetime
+# ==================================================
+
+echo "Disk Lifetime"
+
+ROOT_DISK=$(lsblk -ndo PKNAME "$(findmnt -n -o SOURCE /)" | head -1)
+
+if command -v smartctl >/dev/null 2>&1; then
+
+    if sudo smartctl -a "/dev/$ROOT_DISK" | grep -qi "Percentage Used"; then
+
+        USED=$(sudo smartctl -a "/dev/$ROOT_DISK" | awk -F':' '/Percentage Used/ {gsub(/ /,"",$2); print $2}')
+
+        echo "SSD Lifetime Used : $USED"
+
+    elif sudo smartctl -a "/dev/$ROOT_DISK" | grep -qi "Media_Wearout_Indicator"; then
+
+        sudo smartctl -a "/dev/$ROOT_DISK" | \
+        grep Media_Wearout_Indicator
+
+    else
+
+        echo "Lifetime information unavailable."
+
+    fi
+
+else
+
+    echo "smartctl not installed."
+
+fi
+
+echo
+
+# ==================================================
+# Filesystem Errors
+# ==================================================
+
+echo "Filesystem Errors"
+
+if dmesg | grep -Ei "EXT4-fs error|BTRFS error|XFS error|I/O error" >/dev/null
+then
+    echo "Filesystem problems detected."
+else
+    echo "No filesystem errors found."
+fi
+
+echo
+
+# ==================================================
+# Kernel Version
+# ==================================================
+
+echo "Kernel"
+
+uname -r
+
+echo
+
+# ==================================================
+# OS Information
+# ==================================================
+
+echo "Operating System"
+
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    echo "$PRETTY_NAME"
+fi
+
+echo
+
+# ==================================================
+# Hardware
+# ==================================================
+
+echo "Hardware"
+
+echo "CPU : $(lscpu | awk -F: '/Model name/ {gsub(/^ +/,"",$2); print $2; exit}')"
+
+echo "RAM : $(free -h | awk '/Mem:/ {print $2}')"
+
+GPU=$(lspci | grep -Ei "VGA|3D|Display" | head -1)
+
+echo "GPU : $GPU"
+
+echo
+
+# ==================================================
+# Recommendations
+# ==================================================
+
+echo "Recommendations"
+
+[ "$BROKEN_PKGS" = "YES" ] && \
+echo "- Run your package manager repair command."
+
+[ "$FAILED_SERVICES" = "YES" ] && \
+echo "- Review failed system services."
+
+[ "$ACPI_ERRORS" = "YES" ] && \
+echo "- Check BIOS updates from your manufacturer."
+
+[ "$BROADCOM_DRIVER" = "YES" ] && \
+echo "- Consider replacing the proprietary Broadcom driver."
+
+[ "$LSHW_STATUS" = "MISSING" ] && \
+echo "- Install lshw for complete hardware reports."
+
+[ "$DISK_STATUS" = "FAIL" ] && \
+echo "- Backup your files immediately."
+
+echo
+
+# ==================================================
+# Final Health Score
+# ==================================================
+
+SCORE=100
+
+[ "$BROKEN_PKGS" = "YES" ] && ((SCORE-=10))
+[ "$FAILED_SERVICES" = "YES" ] && ((SCORE-=10))
+[ "$ACPI_ERRORS" = "YES" ] && ((SCORE-=5))
+[ "$BROADCOM_DRIVER" = "YES" ] && ((SCORE-=5))
+[ "$LSHW_STATUS" = "MISSING" ] && ((SCORE-=2))
+[ "$DISK_STATUS" = "FAIL" ] && ((SCORE-=40))
+[ "$FILESYSTEM_STATUS" = "FAIL" ] && ((SCORE-=25))
+[ "$INTERNET_STATUS" = "FAIL" ] && ((SCORE-=10))
+
+[ "$SCORE" -lt 0 ] && SCORE=0
+
+echo "========================================"
+echo
+echo "Final Health Score : $SCORE / 100"
+
+if [ "$SCORE" -ge 95 ]; then
+    GRADE="A+"
+elif [ "$SCORE" -ge 90 ]; then
+    GRADE="A"
+elif [ "$SCORE" -ge 80 ]; then
+    GRADE="B"
+elif [ "$SCORE" -ge 70 ]; then
+    GRADE="C"
+elif [ "$SCORE" -ge 60 ]; then
+    GRADE="D"
+else
+    GRADE="F"
+fi
+
+echo "Grade              : $GRADE"
+echo "Overall Status     : $OVERALL"
+
+echo
+echo "========================================"
+echo
+echo "System scan completed successfully."
