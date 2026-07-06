@@ -14,15 +14,15 @@ or
 cleaner
 ```
 
-Each command automates one or more terminal tasks to make your daily workflow faster, cleaner, and easier.
+Every command automates one or more terminal tasks, making your daily workflow faster, cleaner, and easier.
 
 ---
 
 # Why?
 
-Many terminal tasks require running multiple commands.
+Many everyday terminal tasks require running multiple commands.
 
-For example, updating a Linux system may involve package updates, Flatpak updates, firmware updates, cache cleanup, and many other maintenance commands.
+For example, maintaining your operating system may involve updating packages, cleaning caches, removing unused files, refreshing package indexes, updating firmware, and other maintenance tasks.
 
 Instead of remembering and typing every command manually, simply run:
 
@@ -30,20 +30,20 @@ Instead of remembering and typing every command manually, simply run:
 update
 ```
 
-The goal of this project is to provide clean, memorable one-word commands that simplify everyday terminal usage.
+The goal of this project is to provide clean, memorable one-word commands that simplify everyday terminal usage while remaining easy to customize.
 
 ---
 
 # Features
 
-- 🚀 One-word commands
-- 🐧 Linux support
-- 🍎 macOS support
-- ⚡ One-command installation
-- 🔄 Easy updates
-- 🔧 Easy customization
-- 📦 Lightweight
-- ❤️ Open Source
+- One-word commands
+- Linux support
+- macOS support
+- One-command installation
+- Lightweight
+- Easy customization
+- Easy updates
+- Open Source
 
 ---
 
@@ -106,40 +106,36 @@ No manual setup.
 Just one command.
 
 ---
+
 # Manual Installation
 
-If you prefer not to use the automatic installer, you can install commands manually.
+If you prefer not to use the automatic installer, you can install any command manually.
 
-Copy any command to a directory that exists in your PATH.
+Copy the command you want to a directory that exists in your PATH, then make it executable.
 
 Example:
 
 ```bash
-sudo cp commands/linux/update /usr/local/bin/update
-sudo chmod +x /usr/local/bin/update
+sudo cp commands/linux/<command> /usr/local/bin/<command>
+sudo chmod +x /usr/local/bin/<command>
 ```
 
-You can now run:
+Replace `<command>` with the command you want to install.
 
-```bash
+For example:
+
+```text
 update
-```
-
-The same steps apply to any other command.
-
-Example:
-
-```bash
-sudo cp commands/linux/cleaner /usr/local/bin/cleaner
-sudo chmod +x /usr/local/bin/cleaner
-```
-
-Then simply run:
-
-```bash
 cleaner
+repair
+myip
+speedtest
 ```
+
+After copying the file, simply run the command from any terminal.
+
 ---
+
 # Updating
 
 To install the latest version, simply run the installer again.
@@ -180,13 +176,7 @@ After installation, simply type the command you want.
 
 ```bash
 update
-```
-
-```bash
 cleaner
-```
-
-```bash
 repair
 ```
 
@@ -231,36 +221,58 @@ terminal-shortcuts/
 
 Every command is an independent shell script.
 
-You can edit existing commands or create your own to fit your workflow.
+You can edit existing commands, modify their behavior, or create completely new shortcuts that match your own workflow.
+
+Adding a new command is as simple as placing a new executable file inside:
+
+```text
+commands/linux/
+```
+
+or
+
+```text
+commands/macos/
+```
+
+Running the installer again will automatically install every new command without modifying the installer itself.
 
 ---
 
 # Contributing
 
-Contributions are welcome.
+Contributions are always welcome.
 
-If you'd like to improve Terminal Shortcuts:
+Whether you want to:
 
-1. Fork the repository.
-2. Create a new branch.
-3. Make your changes.
-4. Open a Pull Request.
+- Add a new shortcut
+- Improve an existing command
+- Fix a bug
+- Improve the documentation
+- Support another Linux distribution
+- Improve macOS compatibility
+- Suggest a new feature
 
-Bug reports, feature requests, and suggestions are always appreciated.
+Feel free to open an Issue or submit a Pull Request.
+
+Every contribution, regardless of size, helps improve this project for everyone.
 
 ---
 
 # Roadmap
 
-Planned improvements:
+Planned improvements include:
 
 - More built-in commands
-- Support for additional Linux distributions
+- Additional Linux distribution support
 - Interactive installer
-- Automatic updates
+- Automatic self-update
 - Better documentation
 - Command categories
 - Optional command selection during installation
+- Command auto-completion
+- Optional package manager detection
+- Configuration file support
 
 ---
 
@@ -270,29 +282,13 @@ This project is licensed under the MIT License.
 
 See the `LICENSE` file for more information.
 
-# Contributing
-
-Contributions are welcome and greatly appreciated.
-
-Whether you'd like to:
-
-- Add a new shortcut
-- Improve an existing command
-- Fix a bug
-- Improve the documentation
-- Suggest a new feature
-
-Feel free to open an Issue or submit a Pull Request.
-
-Every contribution, no matter how small, helps make this project better for everyone.
-
 ---
 
-## 💖 Support
+## Support
 
 If you find this project useful, consider supporting its development.
 
-Every contribution helps improve features, maintain the project, and keep it free for everyone.
+Every contribution helps improve new features, maintain the project, and keep it free and open source for everyone.
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/mohsenofficial" target="_blank">
@@ -304,6 +300,6 @@ Every contribution helps improve features, maintain the project, and keep it fre
 
 Built for my own workflow and shared with the open-source community.
 
-If it makes your terminal experience a little faster, cleaner, or easier, then it has achieved its purpose.
+If this project saves you time or simplifies your daily terminal workflow, then it has achieved its purpose.
 
-Made with ❤️ for people who love the terminal.
+Built with passion for developers, power users, and terminal enthusiasts.
