@@ -1,0 +1,438 @@
+#!/usr/bin/env bash
+# Hide permission errors
+exec 2>/dev/null
+
+# --- COLOR PALETTE ---
+BOLD='\033[1m'
+RED='\033[1;31m'
+WHITE='\033[1;37m'
+GRAY='\033[1;30m'
+YELLOW='\033[1;33m'
+GREEN='\033[1;32m'
+CYAN='\033[1;36m'
+MAGENTA='\033[1;35m'
+NC='\033[0m'
+
+VIRT_EXC_ARR=(--exclude=/dev --exclude=/proc --exclude=/sys --exclude=/run --exclude=/tmp --exclude=/media --exclude=/mnt --exclude=/timeshift --exclude=/boot/efi)
+
+while true; do
+    ESTIMATE_TIME=false
+    clear
+    printf "${BOLD}${CYAN}=================================================${NC}\n"
+    printf " 📸 ${BOLD}${WHITE}Snapsize - Timeshift Size Calculator (Pro)${NC}\n"
+    printf "${BOLD}${CYAN}=================================================${NC}\n\n"
+    
+    printf "${YELLOW}Choose a mode to calculate:${NC}\n\n"
+    printf "  ${WHITE}1.${NC} My Setup: Custom settings (Hidden files included, no flatpak...).\n\n"
+    printf "  ${WHITE}2.${NC} Include Only: Backup ONLY specific folders.\n\n"
+    printf "  ${WHITE}3.${NC} Exclude Only: Backup system EXCEPT folders you enter.\n\n"
+    printf "  ${WHITE}4.${NC} Default: Backup system, exclude /home, /root, and flatpak.\n\n"
+    printf "  ${WHITE}5.${NC} Everything: Backup EVERYTHING literally except /mnt.\n\n"
+    printf "  ${WHITE}6.${NC} Custom: Add Includes and Excludes manually from scratch.\n\n"
+    printf "  ${WHITE}7.${NC} ⏱️  USB Estimator: Test flash drive speed & calculate backup time.\n\n"
+    printf "${BOLD}${CYAN}=================================================${NC}\n\n"
+    
+    read -p "$(printf ${BOLD}${MAGENTA}"🤔 Enter mode number (1-7): "${NC})" mode
+
+    # ==========================================
+    # MODE 7: USB SPEED & TIME ESTIMATOR
+    # ==========================================
+    if [[ "$mode" == "7" ]]; then
+        ESTIMATE_TIME=true
+        printf "\n${BOLD}${CYAN}📂 Please enter the mount path of your Flash Drive (e.g., /run/media/$USER/USB_NAME):${NC}\n\n"
+        read -p "$(printf "👉 Path: ")" USB_PATH
+        
+        if [[ ! -d "$USB_PATH" ]]; then
+            printf "\n${RED}❌ Error: Path '$USB_PATH' not found! Check your mount point.${NC}\n\n"
+            sleep 2
+            continue
+        fi
+        
+        printf "\n${MAGENTA}⏱️  Testing Flash Drive Write Speed... (Writing 100MB)${NC}\n\n"
+        SPEED_TEST_RAW=$(dd if=/dev/zero of="$USB_PATH/.speedtest" bs=1M count=100 conv=fdatasync 2>&1 | tail -1)
+        rm -f "$USB_PATH/.speedtest"
+        
+        SPEED_NUM=$(echo "$SPEED_TEST_RAW" | awk '{print $(NF-1)}')
+        SPEED_UNIT=$(echo "$SPEED_TEST_RAW" | awk '{print $NF}')
+        
+        if [[ "$SPEED_UNIT" == "GB/s" ]]; then
+            SPEED_MB=$(echo "$SPEED_NUM * 1024" | bc | cut -d. -f1)
+        elif [[ "$SPEED_UNIT" == "kB/s" || "$SPEED_UNIT" == "KB/s" ]]; then
+            SPEED_MB=$(echo "$SPEED_NUM / 1024" | bc | cut -d. -f1)
+        else
+            SPEED_MB=$(echo "$SPEED_NUM" | cut -d. -f1)
+        fi
+        [[ -z "$SPEED_MB" || "$SPEED_MB" -eq 0 ]] && SPEED_MB=1
+        
+        printf "${GREEN}✅ Flash Drive Write Speed: ${BOLD}${SPEED_NUM} ${SPEED_UNIT}${NC}\n\n"
+        
+        printf "${YELLOW}Which backup mode do you want to estimate time for?${NC}\n\n"
+        printf "  ${WHITE}1.${NC} My Setup\n\n  ${WHITE}2.${NC} Include Only\n\n  ${WHITE}3.${NC} Exclude Only\n\n  ${WHITE}4.${NC} Default\n\n  ${WHITE}5.${NC} Everything\n\n  ${WHITE}6.${NC} Custom\n\n"
+        
+        while true; do
+            read -p "$(printf "👉 Mode (1-6): ")" sub_mode
+            if [[ "$sub_mode" =~ ^[1-6]$ ]]; then
+                mode="$sub_mode"
+                break
+            else
+                printf "\n${RED}❌ Invalid choice!${NC}\n\n"
+            fi
+        done
+    fi
+
+    INCLUDES=()
+    EXCLUDES=()
+    SETUP_NAME="SNAPSIZE"
+
+    # ==========================================
+    # MODES WITH DASHBOARD (1 & 6)
+    # ==========================================
+    if [[ "$mode" == "1" || "$mode" == "6" ]]; then
+        
+        if [[ "$mode" == "1" ]]; then
+            printf "\n${BOLD}${CYAN}✏️  Enter a name for this custom setup (e.g., My Profile):${NC}\n\n"
+            read -p "$(printf "👉 Name: ")" custom_name
+            SETUP_NAME="${custom_name:-My Setup}"
+            
+            INCLUDES=("/")
+            EXCLUDES=(
+                "/home/$USER/[^.]*" 
+                "/home/$USER/.cache" 
+                "/home/$USER/.var" 
+                "/home/$USER/.local/share/Steam" 
+                "/home/$USER/VirtualBox VMs" 
+                "/home/$USER/.local/share/gnome-boxes" 
+                "/home/$USER/.local/share/Trash" 
+                "/var/lib/flatpak" 
+                "/var/lib/snapd"
+            )
+        elif [[ "$mode" == "6" ]]; then
+            SETUP_NAME="CUSTOM MODE"
+            INCLUDES=()
+            EXCLUDES=()
+        fi
+
+        CALC_NOW=false
+        RETURN_TO_MENU=false
+
+        while true; do
+            clear
+            printf "${BOLD}${MAGENTA}=== 🛠️  ${SETUP_NAME^^} DASHBOARD ===${NC}\n"
+            printf "${GRAY}------------------------------------------${NC}\n\n"
+            
+            printf "${BOLD}${GREEN}[ CURRENT INCLUDES (COPIED) ]${NC}\n\n"
+            for i in "${!INCLUDES[@]}"; do 
+                printf "  ${GREEN}I$((i+1)).${NC} ${CYAN}${INCLUDES[$i]}${NC}\n\n"
+            done
+
+            printf "${BOLD}${RED}[ CURRENT EXCLUDES (IGNORED) ]${NC}\n\n"
+            for i in "${!EXCLUDES[@]}"; do 
+                printf "  ${RED}E$((i+1)).${NC} ${CYAN}${EXCLUDES[$i]}${NC}\n\n"
+            done
+            printf "${GRAY}------------------------------------------${NC}\n\n"
+            
+            printf "${BOLD}${WHITE}[ QUICK ACTIONS ]${NC}\n\n"
+            printf "  ${GREEN}1.${NC} ➕ Add INCLUDE   |  ${RED}2.${NC} ➕ Add EXCLUDE\n\n"
+            printf "  ${GREEN}3.${NC} ➖ Del INCLUDE   |  ${RED}4.${NC} ➖ Del EXCLUDE\n\n"
+            printf "${GRAY}------------------------------------------${NC}\n\n"
+            printf "  ${GREEN}5.${NC} ✅ CALCULATE NOW\n\n"
+            printf "  ${YELLOW}0.${NC} 🔙 EXIT TO MAIN MENU\n\n"
+            
+            read -p "$(printf "👉 Choose action/edit (0-5): ")" EDIT_CHOICE
+
+            case ${EDIT_CHOICE} in
+                1)
+                    while true; do
+                        printf "\n✏️  Enter new INCLUDE path: "
+                        read new_path
+                        [[ -n "$new_path" ]] && INCLUDES+=("$new_path") && printf "\n${GREEN}✅ Added!${NC}\n\n"
+                        
+                        VALID_CHOICE=false
+                        while [[ "$VALID_CHOICE" == false ]]; do
+                            printf "  ${CYAN}1.${NC} ➕ Add another INCLUDE path\n\n"
+                            printf "  ${YELLOW}2.${NC} 🔙 Back to Dashboard\n\n"
+                            printf "  ${GREEN}5.${NC} ✅ CALCULATE NOW\n\n"
+                            printf "  ${RED}0.${NC} 🔙 EXIT TO MAIN MENU\n\n"
+                            read -p "$(printf "👉 Choice (1, 2, 5, or 0): ")" c
+                            
+                            if [[ "$c" == "5" ]]; then CALC_NOW=true; VALID_CHOICE=true
+                            elif [[ "$c" == "0" ]]; then RETURN_TO_MENU=true; VALID_CHOICE=true
+                            elif [[ "$c" == "2" ]]; then BACK_DASH=true; VALID_CHOICE=true
+                            elif [[ "$c" == "1" ]]; then VALID_CHOICE=true
+                            else printf "\n${RED}❌ Invalid choice!${NC}\n\n"
+                            fi
+                        done
+                        if [[ "$CALC_NOW" == true || "$RETURN_TO_MENU" == true || "$BACK_DASH" == true ]]; then 
+                            BACK_DASH=false
+                            break
+                        fi
+                    done
+                    if [[ "$CALC_NOW" == true || "$RETURN_TO_MENU" == true ]]; then break; fi
+                    ;;
+                2)
+                    while true; do
+                        printf "\n✏️  Enter new EXCLUDE path: "
+                        read new_path
+                        [[ -n "$new_path" ]] && EXCLUDES+=("$new_path") && printf "\n${GREEN}✅ Added!${NC}\n\n"
+                        
+                        VALID_CHOICE=false
+                        while [[ "$VALID_CHOICE" == false ]]; do
+                            printf "  ${CYAN}1.${NC} ➕ Add another EXCLUDE path\n\n"
+                            printf "  ${YELLOW}2.${NC} 🔙 Back to Dashboard\n\n"
+                            printf "  ${GREEN}5.${NC} ✅ CALCULATE NOW\n\n"
+                            printf "  ${RED}0.${NC} 🔙 EXIT TO MAIN MENU\n\n"
+                            read -p "$(printf "👉 Choice (1, 2, 5, or 0): ")" c
+                            
+                            if [[ "$c" == "5" ]]; then CALC_NOW=true; VALID_CHOICE=true
+                            elif [[ "$c" == "0" ]]; then RETURN_TO_MENU=true; VALID_CHOICE=true
+                            elif [[ "$c" == "2" ]]; then BACK_DASH=true; VALID_CHOICE=true
+                            elif [[ "$c" == "1" ]]; then VALID_CHOICE=true
+                            else printf "\n${RED}❌ Invalid choice!${NC}\n\n"
+                            fi
+                        done
+                        if [[ "$CALC_NOW" == true || "$RETURN_TO_MENU" == true || "$BACK_DASH" == true ]]; then 
+                            BACK_DASH=false
+                            break
+                        fi
+                    done
+                    if [[ "$CALC_NOW" == true || "$RETURN_TO_MENU" == true ]]; then break; fi
+                    ;;
+                3)
+                    printf "\n🗑️  Enter the number to remove (e.g., 1 for I1): "
+                    read idx
+                    if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -gt 0 ] && [ "$idx" -le "${#INCLUDES[@]}" ]; then
+                        unset 'INCLUDES[idx-1]'
+                        INCLUDES=("${INCLUDES[@]}") 
+                        printf "\n${GREEN}✅ Removed!${NC}\n\n"; sleep 0.5
+                    else
+                        printf "\n${RED}❌ Invalid number!${NC}\n\n"; sleep 1
+                    fi
+                    ;;
+                4)
+                    printf "\n🗑️  Enter the number to remove (e.g., 1 for E1): "
+                    read idx
+                    if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -gt 0 ] && [ "$idx" -le "${#EXCLUDES[@]}" ]; then
+                        unset 'EXCLUDES[idx-1]'
+                        EXCLUDES=("${EXCLUDES[@]}") 
+                        printf "\n${GREEN}✅ Removed!${NC}\n\n"; sleep 0.5
+                    else
+                        printf "\n${RED}❌ Invalid number!${NC}\n\n"; sleep 1
+                    fi
+                    ;;
+                5)
+                    CALC_NOW=true
+                    break
+                    ;;
+                0)
+                    RETURN_TO_MENU=true
+                    break
+                    ;;
+                *)
+                    printf "\n${RED}❌ Invalid choice!${NC}\n\n"
+                    sleep 1
+                    ;;
+            esac
+        done
+        
+        if [[ "$RETURN_TO_MENU" == true ]]; then continue; fi
+        if [[ ${#INCLUDES[@]} -eq 0 && "$mode" == "6" ]]; then printf "\n${RED}❌ No paths to calculate!${NC}\n\n"; sleep 1; continue; fi
+
+    # ==========================================
+    # MODE 2: INCLUDE ONLY
+    # ==========================================
+    elif [[ "$mode" == "2" ]]; then
+        INCLUDES=()
+        EXCLUDES=()
+        CALC_NOW=false
+        RETURN_TO_MENU=false
+        
+        printf "\n${BOLD}${WHITE}--- ✅ ADD PATHS TO INCLUDE ---${NC}\n\n"
+        while true; do
+            read -p "$(printf ${YELLOW}"✏️  Enter INCLUDE path: "${NC})" p
+            [[ -n "$p" ]] && INCLUDES+=("$p") && printf "\n${GREEN}✅ Added!${NC}\n\n"
+            
+            VALID_CHOICE=false
+            while [[ "$VALID_CHOICE" == false ]]; do
+                printf "  ${CYAN}1.${NC} ➕ Add another INCLUDE path\n\n"
+                printf "  ${GREEN}5.${NC} ✅ CALCULATE NOW\n\n"
+                printf "  ${RED}0.${NC} 🔙 EXIT TO MAIN MENU\n\n"
+                read -p "$(printf "👉 Choice (1, 5, or 0): ")" c
+                
+                if [[ "$c" == "5" ]]; then CALC_NOW=true; VALID_CHOICE=true
+                elif [[ "$c" == "0" ]]; then RETURN_TO_MENU=true; VALID_CHOICE=true
+                elif [[ "$c" == "1" ]]; then VALID_CHOICE=true
+                else printf "\n${RED}❌ Invalid choice!${NC}\n\n"
+                fi
+            done
+            if [[ "$CALC_NOW" == true || "$RETURN_TO_MENU" == true ]]; then break; fi
+            printf "\n"
+        done
+        
+        if [[ "$RETURN_TO_MENU" == true ]]; then continue; fi
+        if [[ ${#INCLUDES[@]} -eq 0 ]]; then printf "\n${RED}❌ No paths entered!${NC}\n\n"; sleep 1; continue; fi
+
+    # ==========================================
+    # MODE 3: EXCLUDE ONLY
+    # ==========================================
+    elif [[ "$mode" == "3" ]]; then
+        INCLUDES=("/")
+        EXCLUDES=()
+        CALC_NOW=false
+        RETURN_TO_MENU=false
+        
+        printf "\n${BOLD}${WHITE}--- ❌ ADD PATHS TO EXCLUDE ---${NC}\n\n"
+        while true; do
+            read -p "$(printf ${YELLOW}"✏️  Enter EXCLUDE path: "${NC})" p
+            [[ -n "$p" ]] && EXCLUDES+=("$p") && printf "\n${GREEN}✅ Added!${NC}\n\n"
+            
+            VALID_CHOICE=false
+            while [[ "$VALID_CHOICE" == false ]]; do
+                printf "  ${CYAN}1.${NC} ➕ Add another EXCLUDE path\n\n"
+                printf "  ${GREEN}5.${NC} ✅ CALCULATE NOW\n\n"
+                printf "  ${RED}0.${NC} 🔙 EXIT TO MAIN MENU\n\n"
+                read -p "$(printf "👉 Choice (1, 5, or 0): ")" c
+                
+                if [[ "$c" == "5" ]]; then CALC_NOW=true; VALID_CHOICE=true
+                elif [[ "$c" == "0" ]]; then RETURN_TO_MENU=true; VALID_CHOICE=true
+                elif [[ "$c" == "1" ]]; then VALID_CHOICE=true
+                else printf "\n${RED}❌ Invalid choice!${NC}\n\n"
+                fi
+            done
+            if [[ "$CALC_NOW" == true || "$RETURN_TO_MENU" == true ]]; then break; fi
+            printf "\n"
+        done
+        
+        if [[ "$RETURN_TO_MENU" == true ]]; then continue; fi
+        if [[ ${#EXCLUDES[@]} -eq 0 ]]; then printf "\n${RED}❌ No paths entered!${NC}\n\n"; sleep 1; continue; fi
+
+    # ==========================================
+    # MODE 4 & 5: FAST AUTOMATIC
+    # ==========================================
+    elif [[ "$mode" == "4" ]]; then
+        INCLUDES=("/")
+        EXCLUDES=("/home" "/root" "/var/lib/flatpak")
+    elif [[ "$mode" == "5" ]]; then
+        INCLUDES=("/")
+        EXCLUDES=()
+    else
+        printf "\n${RED}❌ Invalid choice. Please try again.${NC}\n\n"
+        sleep 1
+        continue
+    fi
+
+    # ==========================================
+    # UNIFIED CALCULATION ENGINE 🚀
+    # ==========================================
+    printf "\n${MAGENTA}⏳ Scanning... (This may take a few seconds)${NC}\n\n"
+
+    # 1. Calculate Excludes
+    TOTAL_EXC="0M"
+    EXC_LIST="-> Path: (None) (Size: 0M) (Hidden Files: ✅)"
+    
+    if [[ "$mode" == "2" ]]; then
+        # Mode 2 Reverse Engine: Calculate total size of system MINUS the included paths
+        MODE2_EXC_ARGS=()
+        for i in "${INCLUDES[@]}"; do MODE2_EXC_ARGS+=("--exclude=$i"); done
+        
+        TOTAL_EXC=$(sudo du -shxc "${VIRT_EXC_ARR[@]}" "${MODE2_EXC_ARGS[@]}" / 2>/dev/null | grep total | awk '{print $1}')
+        [[ -z "$TOTAL_EXC" ]] && TOTAL_EXC=$(sudo du -shx "${VIRT_EXC_ARR[@]}" "${MODE2_EXC_ARGS[@]}" / 2>/dev/null | head -n1 | awk '{print $1}')
+        
+        EXC_LIST=$(sudo du -shx "${VIRT_EXC_ARR[@]}" "${MODE2_EXC_ARGS[@]}" /* 2>/dev/null | awk '$1 != "0" {print "-> Path: " $2 " (Size: " $1 ") (Hidden Files: ✅)"}')
+        
+    elif [ ${#EXCLUDES[@]} -gt 0 ]; then
+        TOTAL_EXC=$(sudo du -shxc "${EXCLUDES[@]}" 2>/dev/null | grep total | awk '{print $1}')
+        [[ -z "$TOTAL_EXC" ]] && TOTAL_EXC=$(sudo du -shx "${EXCLUDES[@]}" 2>/dev/null | head -n1 | awk '{print $1}')
+        
+        EXC_LIST=$(sudo du -shxc "${EXCLUDES[@]}" 2>/dev/null | grep -v total | awk '{print "-> Path: " $2 " (Size: " $1 ") (Hidden Files: ✅)"}')
+    fi
+
+    # 2. Calculate Includes
+    TOTAL_INC="0M"
+    INC_LIST="-> Path: (None) (Size: 0M) (Hidden Files: ✅)"
+    DU_EXC_ARGS=()
+    for e in "${EXCLUDES[@]}"; do DU_EXC_ARGS+=("--exclude=$e"); done
+
+    if [ ${#INCLUDES[@]} -gt 0 ]; then
+        TOTAL_INC=$(sudo du -shxc "${VIRT_EXC_ARR[@]}" "${DU_EXC_ARGS[@]}" "${INCLUDES[@]}" 2>/dev/null | grep total | awk '{print $1}')
+        [[ -z "$TOTAL_INC" ]] && TOTAL_INC=$(sudo du -shx "${VIRT_EXC_ARR[@]}" "${DU_EXC_ARGS[@]}" "${INCLUDES[@]}" 2>/dev/null | head -n1 | awk '{print $1}')
+        
+        INC_LIST=$(sudo du -shxc "${VIRT_EXC_ARR[@]}" "${DU_EXC_ARGS[@]}" "${INCLUDES[@]}" 2>/dev/null | grep -v total | awk '{print "-> Path: " $2 " (Size: " $1 ") (Hidden Files: ✅)"}')
+    fi
+
+    # ==========================================
+    # FINAL UNIFIED OUTPUT FORMAT
+    # ==========================================
+    printf "${GREEN}✅ Files to be COPIED - Total Size: ${BOLD}${TOTAL_INC:-0M}${NC}\n\n"
+    
+    echo "$INC_LIST" | while IFS= read -r line; do
+        [[ -n "$line" ]] && printf "${CYAN}%s${NC}\n\n" "$line"
+    done
+
+    printf "${RED}❌ Files to be IGNORED - Total Size: ${BOLD}${TOTAL_EXC:-0M}${NC}\n\n"
+    
+    echo "$EXC_LIST" | while IFS= read -r line; do
+        [[ -n "$line" ]] && printf "${YELLOW}%s${NC}\n\n" "$line"
+    done
+
+    # ==========================================
+    # TIME ESTIMATION OUTPUT (If Mode 7)
+    # ==========================================
+    if [[ "$ESTIMATE_TIME" == true ]]; then
+        NUM=$(echo "$TOTAL_INC" | tr -d -c '0-9.')
+        UNIT=$(echo "$TOTAL_INC" | tr -d '0-9.')
+        
+        if [[ "$UNIT" == "G" ]]; then
+            TOTAL_INC_MB=$(echo "$NUM * 1024" | bc | cut -d. -f1)
+        elif [[ "$UNIT" == "T" ]]; then
+            TOTAL_INC_MB=$(echo "$NUM * 1024 * 1024" | bc | cut -d. -f1)
+        elif [[ "$UNIT" == "K" ]]; then
+            TOTAL_INC_MB=1
+        else
+            TOTAL_INC_MB=$(echo "$NUM" | cut -d. -f1)
+        fi
+        [[ -z "$TOTAL_INC_MB" ]] && TOTAL_INC_MB=0
+        
+        if [[ "$TOTAL_INC_MB" -gt 0 ]]; then
+            TIME_SEC=$(echo "$TOTAL_INC_MB / $SPEED_MB" | bc)
+            # Add 25% safety margin for small files
+            TIME_SEC=$(echo "$TIME_SEC * 125 / 100" | bc)
+            
+            TIME_MIN=$(echo "$TIME_SEC / 60" | bc)
+            TIME_SEC_REM=$(echo "$TIME_SEC % 60" | bc)
+            
+            printf "${BOLD}${CYAN}=================================================${NC}\n\n"
+            printf "⏱️  ${BOLD}${YELLOW}ESTIMATED BACKUP TIME ON FLASH DRIVE:${NC}\n\n"
+            printf "  ${WHITE}Write Speed:${NC} ${SPEED_NUM} ${SPEED_UNIT}\n\n"
+            printf "  ${WHITE}Total Size :${NC} ${TOTAL_INC}\n\n"
+            printf "  ${WHITE}Est. Time  :${NC} ${BOLD}${GREEN}${TIME_MIN}m ${TIME_SEC_REM}s${NC} ${GRAY}(Includes 25%% safety margin)${NC}\n\n"
+        fi
+    fi
+
+    # ==========================================
+    # NEXT ACTIONS
+    # ==========================================
+    printf "${BOLD}${CYAN}=================================================${NC}\n\n"
+    printf "${BOLD}${WHITE}🤔 What would you like to do next?${NC}\n\n"
+    printf "  ${CYAN}1.${NC} 🔄 Perform another calculation\n\n"
+    printf "  ${GREEN}2.${NC} 🚀 Run Timeshift NOW (Create Snapshot via CLI)\n\n"
+    printf "  ${YELLOW}3.${NC} 🖥️  Open Timeshift GUI (App Window)\n\n"
+    printf "  ${RED}0.${NC} ❌ Exit\n\n"
+    
+    read -p "$(printf "👉 Choose action (0-3): ")" next_action
+    
+    if [[ "$next_action" == "2" ]]; then
+        printf "\n${MAGENTA}🚀 Creating Timeshift Snapshot via Terminal...${NC}\n\n"
+        sudo timeshift --create
+        printf "\n${GREEN}✅ Snapshot Created! Goodbye.${NC}\n\n"
+        break
+    elif [[ "$next_action" == "3" ]]; then
+        printf "\n${MAGENTA}🖥️  Opening Timeshift GUI...${NC}\n\n"
+        sudo timeshift-gtk &>/dev/null &
+        printf "${GREEN}✅ Timeshift opened in a new window. Goodbye!${NC}\n\n"
+        break
+    elif [[ "$next_action" == "0" ]]; then
+        printf "\n${GREEN}✅ See you later!${NC}\n\n"
+        break
+    fi
+    # Loop restarts automatically if 1 is chosen
+done
