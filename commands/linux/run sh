@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Get the script's own filename
+SCRIPT_NAME=$(basename "$0")
+
+echo "Executing setup for: $SCRIPT_NAME"
+
+# 1. Give execution permissions
+chmod +x "$SCRIPT_NAME"
+
+# 2. Run as root if not already
+if [ "$EUID" -ne 0 ]; then
+    echo "Restarting with root privileges..."
+    sudo bash "$SCRIPT_NAME"
+    exit
+fi
+
+echo "Running script with root privileges..."
+# The rest of your original script logic goes here
