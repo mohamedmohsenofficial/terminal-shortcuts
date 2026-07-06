@@ -258,4 +258,3 @@ Built for my own workflow and shared with the open-source community.
 If it makes your terminal experience a little faster, cleaner, or easier, then it has achieved its purpose.
 
 Made with ❤️ for people who love the terminal.
-```
