@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =========================================================
-# ===    Fedora GRUB Repair Script (For Your Device)     ===
+# ===    Linux GRUB Repair Script (Universal)            ===
 # === Based on: Root=/dev/nvme0n1p1 | EFI=/dev/nvme0n1p2 ===
 # =========================================================
 
@@ -15,7 +15,7 @@ fi
 # --- 1. Define partitions (Based on your device) ---
 ROOT_PART="/dev/nvme0n1p1"
 EFI_PART="/dev/nvme0n1p2"
-MNT_DIR="/mnt/fedora_rescue"
+MNT_DIR="/mnt/linux_rescue"
 
 echo "--- Starting repair process ---"
 
@@ -26,7 +26,6 @@ umount -R $MNT_DIR 2>/dev/null # To ensure it is not in use
 
 # --- 3. Mount partitions ---
 echo "2. Mounting Root partition ($ROOT_PART)..."
-# You are using ext4, not btrfs
 mount $ROOT_PART $MNT_DIR
 if [ $? -ne 0 ]; then
     echo "Failed to mount Root. Exiting."
@@ -48,14 +47,34 @@ mount --bind /dev/pts $MNT_DIR/dev/pts
 mount --bind /proc $MNT_DIR/proc
 mount --bind /sys $MNT_DIR/sys
 
-# --- 5. Enter and perform actual repair ---
+# --- 5. Detect Package Manager and Enter Chroot ---
 echo "5. Entering chroot and executing repair commands..."
+
+# Determine package manager command
+if command -v pacman &> /dev/null; then
+    PKG_INSTALL="pacman -S --noconfirm"
+    GRUB_UPDATE_CMD="grub-mkconfig -o /boot/grub/grub.cfg"
+    GRUB_PKG="grub efibootmgr"
+elif command -v dnf &> /dev/null; then
+    PKG_INSTALL="dnf reinstall -y"
+    GRUB_UPDATE_CMD="grub2-mkconfig -o /boot/grub2/grub.cfg"
+    GRUB_PKG="shim-* grub2-efi-* grub2-common"
+elif command -v apt &> /dev/null; then
+    PKG_INSTALL="apt install --reinstall -y"
+    GRUB_UPDATE_CMD="update-grub"
+    GRUB_PKG="grub-efi-amd64 shim-signed"
+else
+    echo "Unsupported package manager."
+    umount -R $MNT_DIR
+    exit 1
+fi
+
 chroot $MNT_DIR /bin/bash -c "
     echo '    [Inside chroot]: Reinstalling boot packages...'
-    dnf reinstall -y shim-* grub2-efi-* grub2-common
+    $PKG_INSTALL $GRUB_PKG
     
-    echo '    [Inside chroot]: Updating GRUB menu to detect Windows...'
-    grub2-mkconfig -o /boot/grub2/grub.cfg
+    echo '    [Inside chroot]: Updating GRUB menu...'
+    $GRUB_UPDATE_CMD
     
     echo '    [Inside chroot]: ... Repair completed. Exiting.'
 "
@@ -68,15 +87,5 @@ rmdir $MNT_DIR
 
 echo "---"
 echo "Success! Everything has been completed successfully!"
-
-# 1. The command that was failing (it will work this time)
-dnf reinstall -y grub2-efi-x64 shim-*
-
-# 2. Build boot list (to detect Windows)
-grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg
-
-# 3. Exit chroot
-exit
-
 echo "You can now restart and remove the flash drive."
 echo "---"
