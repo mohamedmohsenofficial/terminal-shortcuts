@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# Update system packages (DNF)
+if command -v dnf &> /dev/null; then
+    sudo dnf upgrade --refresh -y
+    sudo dnf update -y
+    sudo dnf autoremove -y
+    sudo dnf clean all
+    sudo rm -rf /var/cache/dnf/*
+    sudo dnf makecache
+    sudo dnf check-update
+    echo "DNF cache size:"
+    sudo du -sh /var/cache/dnf
+fi
+
+# Update Flatpak applications
+if command -v flatpak &> /dev/null; then
+    sudo flatpak update -y
+    sudo flatpak uninstall --unused -y
+fi
+
+# Update Firmware
+if command -v fwupdmgr &> /dev/null; then
+    sudo fwupdmgr refresh --force
+    sudo fwupdmgr update -y
+    sudo fwupdtool get-history | head -n 15
+fi
+
+# Clean Thumbnails
+sudo rm -rf ~/.cache/thumbnails/*
+
+# Vacuum Journal Logs (Keep last 3 days)
+sudo journalctl --vacuum-time=3d
+
+# Configure Journal Size Limit
+if [ -f /etc/systemd/journald.conf ]; then
+    sudo sed -i 's/#SystemMaxUse=/SystemMaxUse=50M/' /etc/systemd/journald.conf
+    sudo systemctl restart systemd-journald
+fi
+
+# Clean ABRT and Coredump logs
+sudo rm -rf /var/spool/abrt/*
+sudo rm -rf /var/lib/systemd/coredump/*
+
+echo "System Update, Cleanup, and Cache Refresh Complete!"
