@@ -1,0 +1,110 @@
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  🚀 Windows Intelligent System Cleaner" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+# 5. Strict Protection (Diplomatic Immunity)
+$PROTECTED_REGEX = "(?i)(Microsoft|Windows|System|Code|vscode|codium|docker|containers|podman|wsl|ubuntu|kali|debian|intel|amd|nvidia|google)"
+
+# 1. OS Roots & Deep Cache
+Write-Host "`n[1/3] Scanning Temp & OS Cache..." -ForegroundColor Yellow
+$CACHE_TARGETS = @("$env:TEMP\*", "C:\Windows\Temp\*", "C:\Windows\SoftwareDistribution\Download\*")
+
+while ($CACHE_TARGETS.Count -gt 0) {
+    $sizeBytes = 0
+    Write-Host "`n🔍 Found disposable cache directories:"
+    foreach ($p in $CACHE_TARGETS) {
+        $parentPath = Split-Path $p
+        $leafPath = Split-Path $p -Leaf
+        if (Test-Path $parentPath) {
+            $items = Get-ChildItem -Path $parentPath -Filter $leafPath -Recurse -Force -ErrorAction SilentlyContinue
+            if ($items) { 
+                $sum = ($items | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum 
+                $sizeBytes += $sum
+                $folderMB = [math]::Round($sum / 1MB, 2)
+                Write-Host " -> $parentPath ($folderMB MB)"
+            }
+        }
+    }
+
+    $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+    if ($sizeMB -eq 0) { Write-Host "[OK] Cache is clean."; break }
+
+    Write-Host "`nTotal Cache Size: $sizeMB MB" -ForegroundColor Green
+    Write-Host "  1) ✅ Approve & Delete All"
+    Write-Host "  2) ➕ Add Exception (Skip a specific folder/keyword)"
+    Write-Host "  0) ❌ Skip / Cancel Caches Cleanup"
+    $choice = Read-Host "👉 Choice (0-2)"
+
+    if ($choice -eq "1") {
+        foreach ($p in $CACHE_TARGETS) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
+        Write-Host "[OK] Caches cleared." -ForegroundColor Green
+        break
+    } elseif ($choice -eq "2") {
+        $excText = Read-Host "✏️ Enter text to exclude"
+        $newTargets = @()
+        foreach ($t in $CACHE_TARGETS) { if ($t -notmatch $excText) { $newTargets += $t } }
+        $CACHE_TARGETS = $newTargets
+        Write-Host "✅ Exception applied!" -ForegroundColor Green
+    } elseif ($choice -eq "0") { Write-Host "[SKIPPED]" -ForegroundColor Gray; break }
+}
+
+# 4. Orphaned Folders Radar (AppData vs Program Files)
+Write-Host "`n[2/3] Scanning for Orphaned Config Folders (AppData)..." -ForegroundColor Yellow
+$ORPHANS = @()
+$appDataPaths = @($env:APPDATA, $env:LOCALAPPDATA)
+
+foreach ($baseDir in $appDataPaths) {
+    $folders = Get-ChildItem -Path $baseDir -Directory -ErrorAction SilentlyContinue
+    foreach ($folder in $folders) {
+        if ($folder.Name -match $PROTECTED_REGEX) { continue }
+        
+        # Check if corresponding app exists in Program Files
+        $progPath1 = Join-Path "C:\Program Files" $folder.Name
+        $progPath2 = Join-Path "C:\Program Files (x86)" $folder.Name
+        if (-not (Test-Path $progPath1) -and -not (Test-Path $progPath2)) {
+            $ORPHANS += $folder.FullName
+        }
+    }
+}
+
+while ($ORPHANS.Count -gt 0) {
+    $sizeBytes = 0
+    Write-Host "`n🔍 Found potentially orphaned folders:"
+    foreach ($p in $ORPHANS) {
+        $sum = (Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
+        $sizeBytes += $sum
+        $folderMB = [math]::Round($sum / 1MB, 2)
+        Write-Host " -> $p ($folderMB MB)"
+    }
+
+    $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+    if ($sizeMB -eq 0) { break }
+
+    Write-Host "`nTotal Orphan Size: $sizeMB MB" -ForegroundColor Red
+    Write-Host "  1) ✅ Approve & Delete All"
+    Write-Host "  2) ➕ Add Exception (Skip a specific folder/keyword)"
+    Write-Host "  0) ❌ Skip / Cancel Orphans Cleanup"
+    $choice = Read-Host "👉 Choice (0-2)"
+
+    if ($choice -eq "1") {
+        foreach ($p in $ORPHANS) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
+        Write-Host "[OK] Orphaned folders deleted." -ForegroundColor Green
+        break
+    } elseif ($choice -eq "2") {
+        $excText = Read-Host "✏️ Enter text to exclude"
+        $newOrphans = @()
+        foreach ($t in $ORPHANS) { if ($t -notmatch $excText) { $newOrphans += $t } }
+        $ORPHANS = $newOrphans
+        Write-Host "✅ Exception applied!" -ForegroundColor Green
+    } elseif ($choice -eq "0") { Write-Host "[SKIPPED]" -ForegroundColor Gray; break }
+}
+
+# 2. Containers Cleanup
+Write-Host "`n[3/3] Cleaning Docker Remnants..." -ForegroundColor Yellow
+If (Get-Command docker -ErrorAction SilentlyContinue) {
+    docker builder prune -a
+    docker image prune
+} else { Write-Host "[SKIPPED] Docker not found." -ForegroundColor Gray }
+
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "  ✨ Cleanup Completed Successfully!" -ForegroundColor Cyan
