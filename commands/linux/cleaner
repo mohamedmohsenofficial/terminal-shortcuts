@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+
+if [ "$EUID" -ne 0 ]; then
+  echo -e "\033[1;31m[ERROR] Please run this script as root (using sudo)\033[0m"
+  exit 1
+fi
+
+USER_HOME=$(eval echo ~$SUDO_USER)
+[[ -z "$USER_HOME" || "$USER_HOME" == "/" ]] && USER_HOME=$HOME
+
+# Strict protection list to prevent deletion of critical development/system configs
+PROTECTED_REGEX="(code|vscode|codium|docker|containers|podman|distrobox|toolbox|timeshift|ubuntu|arch|fedora|debian|alpine|gtk|dconf|font|pulse|mime|systemd|user-dirs)"
+
+echo -e "\033[1;36m========================================\033[0m"
+echo -e "\033[1;36m  🚀 Interactive Linux System Cleaner\033[0m"
+echo -e "\033[1;36m========================================\033[0m"
+
+# 1. OS Detection & Package Manager Cleanup
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    OS_LIKE=$ID_LIKE
+fi
+
+echo -e "\n\033[1;33m[1/4] Cleaning Package Manager...\033[0m"
+if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+    dnf autoremove
+    dnf clean all
+elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
+    apt autoremove
+    apt autoclean
+    apt clean
+elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
+    ORPHANS=$(pacman -Qtdq)
+    if [ -n "$ORPHANS" ]; then
+        pacman -Rns $ORPHANS
+    fi
+    pacman -Sc
+fi
+
+# 2. Containers & Flatpak
+echo -e "\n\033[1;33m[2/4] Cleaning Docker & Flatpak...\033[0m"
+if command -v flatpak &> /dev/null; then
+    flatpak uninstall --unused
+fi
+if command -v docker &> /dev/null; then
+    docker builder prune -a
+    docker image prune
+fi
+
+# 3. Deep Cache & Crash Logs
+echo -e "\n\033[1;33m[3/4] Scanning System Cache & Crash Logs...\033[0m"
+TARGETS_TO_DEL=()
+SYS_CACHES=("/var/spool/abrt" "/var/crash" "/var/lib/systemd/coredump" "/var/cache/snapd")
+
+for d in "${SYS_CACHES[@]}"; do
+    if [ -d "$d" ]; then
+        TARGETS_TO_DEL+=("$d")
+    fi
+done
+
+if [ -d "$USER_HOME/.cache" ]; then
+    while IFS= read -r -d '' dir; do
+        TARGETS_TO_DEL+=("$dir")
+    done < <(find "$USER_HOME/.cache" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | grep -z -E -v -i "$PROTECTED_REGEX")
+fi
+
+if [ ${#TARGETS_TO_DEL[@]} -gt 0 ]; then
+    echo "Found disposable cache/log directories:"
+    sudo du -shc "${TARGETS_TO_DEL[@]}" 2>/dev/null | grep -v "total"
+    TOTAL_CACHE=$(sudo du -shc "${TARGETS_TO_DEL[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
+    
+    echo -e "\nTotal Cache Size: \033[1;32m$TOTAL_CACHE\033[0m"
+    read -p "Do you want to delete these caches? (y/n): " conf_cache
+    if [[ "$conf_cache" =~ ^[Yy]$ ]]; then
+        for target in "${TARGETS_TO_DEL[@]}"; do
+            find "$target" -mindepth 1 -delete 2>/dev/null
+        done
+        echo -e "\033[1;32m[OK] Caches cleared.\033[0m"
+    else
+        echo -e "\033[1;30m[SKIPPED]\033[0m"
+    fi
+else
+    echo -e "\033[1;32m[OK] Caches are already clean.\033[0m"
+fi
+
+# 4. Orphaned Folders (Leftover Configurations)
+echo -e "\n\033[1;33m[4/4] Scanning for Orphaned Config Folders...\033[0m"
+ORPHANS=()
+for base_dir in "$USER_HOME/.config" "$USER_HOME/.local/share"; do
+    if [ -d "$base_dir" ]; then
+        for DIR_PATH in "$base_dir"/*; do
+            [ ! -d "$DIR_PATH" ] && continue
+            DIR_NAME=$(basename "$DIR_PATH" | tr '[:upper:]' '[:lower:]')
+            
+            # Skip protected directories
+            [[ "$DIR_NAME" =~ $PROTECTED_REGEX ]] && continue
+            
+            BASE_NAME="${DIR_NAME%-*}"
+            if ! command -v "$DIR_NAME" &> /dev/null && ! command -v "$BASE_NAME" &> /dev/null; then
+                ORPHANS+=("$DIR_PATH")
+            fi
+        done
+    fi
+done
+
+if [ ${#ORPHANS[@]} -gt 0 ]; then
+    echo "Found potentially orphaned folders (No associated installed app):"
+    sudo du -shc "${ORPHANS[@]}" 2>/dev/null | grep -v "total"
+    TOTAL_ORPHAN=$(sudo du -shc "${ORPHANS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
+    
+    echo -e "\nTotal Orphan Size: \033[1;31m$TOTAL_ORPHAN\033[0m"
+    read -p "Do you want to permanently delete these orphaned folders? (y/n): " conf_orph
+    if [[ "$conf_orph" =~ ^[Yy]$ ]]; then
+        rm -rf "${ORPHANS[@]}"
+        echo -e "\033[1;32m[OK] Orphaned folders deleted.\033[0m"
+    else
+        echo -e "\033[1;30m[SKIPPED]\033[0m"
+    fi
+else
+    echo -e "\033[1;32m[OK] No orphaned folders found.\033[0m"
+fi
+
+echo -e "\n\033[1;36m========================================\033[0m"
+echo -e "\033[1;36m  ✨ Cleanup Completed Successfully!\033[0m"
+echo -e "\033[1;36m========================================\033[0m"
