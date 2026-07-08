@@ -1,1 +1,86 @@
+#!/usr/bin/env bash
 
+# Colors
+RED='\033[1;31m'; GREEN='\033[1;32m'; YELLOW='\033[1;33m'; CYAN='\033[1;36m'; NC='\033[0m'
+
+echo -e "${CYAN}========================================${NC}\n"
+
+echo -e "  🚀 macOS Master Updater & Cleaner\n"
+
+echo -e "${CYAN}========================================${NC}\n"
+
+# 1. Checking Dependencies
+echo -e "  ${YELLOW}[1/4]${NC} Checking required update modules...\n"
+
+if ! command -v brew &> /dev/null; then
+    echo -e "  ⚠️  Homebrew not found. App updates will be limited.\n"
+fi
+
+if ! command -v mas &> /dev/null && command -v brew &> /dev/null; then
+    echo -e "  📦 Installing 'mas' (Mac App Store CLI)...\n"
+    brew install mas >/dev/null 2>&1
+fi
+
+# 2. Scanning for Updates
+echo -e "  ${YELLOW}[2/4]${NC} 🔵 ${CYAN}Scan${NC} for OS and App updates...\n"
+
+echo -e "  🔍 Available macOS System Updates:\n"
+softwareupdate -l 2>/dev/null | grep -E "Software Update found|Title|Version"
+echo -e "\n"
+
+echo -e "  🔍 Available App Updates (App Store):\n"
+if command -v mas &> /dev/null; then mas outdated; else echo -e "  (mas CLI not installed)\n"; fi
+echo -e "\n"
+
+echo -e "  🔍 Available App Updates (Homebrew):\n"
+if command -v brew &> /dev/null; then brew outdated; else echo -e "  (Homebrew not installed)\n"; fi
+echo -e "\n"
+
+# 3. User Confirmation
+echo -e "${CYAN}========================================${NC}\n"
+
+echo -e "  1. 🟢 ${GREEN}Approve${NC} & ${GREEN}Update${NC} Everything (OS + Apps)\n"
+
+echo -e "  0. ❌ \033[1;30mSkip${NC} / ${RED}Cancel${NC} Updates\n"
+
+read -p "👉 Choice (0-1): " choice
+echo -e "\n"
+
+if [[ "$choice" == "1" ]]; then
+    
+    # Executing Updates
+    echo -e "  ${YELLOW}[3/4]${NC} ⏳ Executing Updates...\n"
+    
+    echo -e "  🔄 Updating macOS System:\n"
+    sudo softwareupdate -i -a
+    echo -e "\n  ✅ System updated successfully!\n"
+    
+    if command -v mas &> /dev/null; then
+        echo -e "  🔄 Updating App Store Apps:\n"
+        mas upgrade
+    fi
+    
+    if command -v brew &> /dev/null; then
+        echo -e "  🔄 Updating Homebrew Apps:\n"
+        brew upgrade
+    fi
+    
+    echo -e "\n  ✅ Apps updated successfully!\n"
+
+    # 4. Cleaning Junk
+    echo -e "  ${YELLOW}[4/4]${NC} 🧹 Cleaning Update 🔴 ${RED}Garbage${NC} & Leftovers...\n"
+    
+    if command -v brew &> /dev/null; then brew cleanup -s; fi
+    sudo rm -rf /Library/Updates/* 2>/dev/null
+    
+    echo -e "  ✅ Cleanup completed. Caches cleared!\n"
+
+else
+    echo -e "  ⏭️ ${YELLOW}Pending${NC} updates were skipped.\n"
+fi
+
+echo -e "${CYAN}========================================${NC}\n"
+
+echo -e "  ✨ Master Update Completed Successfully!\n"
+
+echo -e "${CYAN}========================================${NC}\n"
