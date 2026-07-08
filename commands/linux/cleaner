@@ -1,88 +1,38 @@
 #!/usr/bin/env bash
 
+RED='\033[1;31m'; GREEN='\033[1;32m'; YELLOW='\033[1;33m'; CYAN='\033[1;36m'; WHITE='\033[1;37m'; NC='\033[0m'
+
 if [ "$EUID" -ne 0 ]; then
-  echo -e "\033[1;31m[ERROR] Please run this script as root (using sudo)\033[0m\n"
+  echo -e "${RED}[ERROR] Please run this script as root (using sudo)${NC}\n\n"
   exit 1
 fi
 
 USER_HOME=$(eval echo ~$SUDO_USER)
 [[ -z "$USER_HOME" || "$USER_HOME" == "/" ]] && USER_HOME=$HOME
 
-# 5. Strict Protection (Diplomatic Immunity)
 PROTECTED_REGEX="(code|vscode|codium|docker|containers|podman|distrobox|toolbox|timeshift|ubuntu|arch|fedora|debian|alpine|gtk|dconf|font|pulse|mime|systemd|user-dirs)"
 
-echo -e "\033[1;36m========================================\033[0m\n"
+echo -e "${CYAN}========================================${NC}\n\n"
 
-echo -e "\033[1;36m  🚀 Linux Intelligent System Cleaner\033[0m\n"
+echo -e "  🚀 Linux Master Cleaner\n\n"
 
-echo -e "\033[1;36m========================================\033[0m\n"
+echo -e "${CYAN}========================================${NC}\n\n"
 
 if [ -f /etc/os-release ]; then . /etc/os-release; OS=$ID; OS_LIKE=$ID_LIKE; fi
 
-# 1. Package Manager Cleanup
-echo -e "\033[1;33m[1/4] Cleaning Package Manager Roots...\033[0m\n"
-if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-    dnf autoremove; dnf clean all
-elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
-    apt autoremove; apt autoclean; apt clean
-elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
-    ORPHANS=$(pacman -Qtdq)
-    if [ -n "$ORPHANS" ]; then pacman -Rns $ORPHANS; fi
-    pacman -Sc
-fi
+echo -e "  ${YELLOW}[1/2]${NC} 🔵 ${CYAN}Scanning${NC} 🔴 ${RED}Garbage${NC} & Orphans...\n\n"
 
-# 2. Containers & Flatpak Cleanup
-echo -e "\033[1;33m[2/4] Cleaning Docker & Flatpak Remnants...\033[0m\n"
-if command -v flatpak &> /dev/null; then flatpak uninstall --unused; fi
-if command -v docker &> /dev/null; then docker builder prune -a; docker image prune; fi
+TARGETS=("/var/spool/abrt" "/var/crash" "/var/lib/systemd/coredump" "$USER_HOME/.cache/thumbnails")
 
-# 3. Deep Cache & Crash Logs
-echo -e "\033[1;33m[3/4] Scanning System Cache & Crash Logs...\033[0m\n"
-TARGETS=()
-for d in "/var/spool/abrt" "/var/crash" "/var/lib/systemd/coredump" "/var/cache/snapd"; do
-    [ -d "$d" ] && TARGETS+=("$d")
-done
+if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then TARGETS+=("/var/cache/dnf")
+elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then TARGETS+=("/var/cache/apt/archives")
+elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then TARGETS+=("/var/cache/pacman/pkg"); fi
 
 if [ -d "$USER_HOME/.cache" ]; then
     while IFS= read -r -d '' dir; do TARGETS+=("$dir")
     done < <(find "$USER_HOME/.cache" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | grep -z -E -v -i "$PROTECTED_REGEX")
 fi
 
-while [ ${#TARGETS[@]} -gt 0 ]; do
-    echo -e "🔍 Found disposable cache directories:\n"
-    sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep -v "total"
-    TOTAL_CACHE=$(sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
-    
-    echo -e "\nTotal Cache Size: \033[1;32m$TOTAL_CACHE\033[0m\n"
-    
-    echo -e "  1. ✅ \033[1;32mApprove\033[0m & \033[1;31mDelete\033[0m All\n"
-    
-    echo -e "  2. ➕ Add \033[1;33mException\033[0m (Skip a specific folder/keyword)\n"
-    
-    echo -e "  0. ❌ \033[1;30mSkip\033[0m / \033[1;31mCancel\033[0m Caches Cleanup\n"
-    
-    read -p "👉 Choice (0-2): " choice
-    echo ""
-    
-    if [[ "$choice" == "1" ]]; then
-        for t in "${TARGETS[@]}"; do find "$t" -mindepth 1 -delete 2>/dev/null; done
-        echo -e "\033[1;32m[OK] Caches cleared.\033[0m\n"; break
-    elif [[ "$choice" == "2" ]]; then
-        read -p "✏️  Enter text to exclude (e.g., mozilla): " exc_text
-        echo ""
-        NEW_TARGETS=()
-        for t in "${TARGETS[@]}"; do
-            if ! echo "$t" | grep -q -i "$exc_text"; then NEW_TARGETS+=("$t"); fi
-        done
-        TARGETS=("${NEW_TARGETS[@]}")
-        echo -e "\033[1;32m✅ Exception applied!\033[0m\n"
-    elif [[ "$choice" == "0" ]]; then echo -e "\033[1;30m[SKIPPED]\033[0m\n"; break
-    else echo -e "\033[1;31mInvalid choice.\033[0m\n"; fi
-done
-
-# 4. Orphaned Folders Radar
-echo -e "\033[1;33m[4/4] Scanning for Orphaned Config Folders...\033[0m\n"
-ORPHANS=()
 for base_dir in "$USER_HOME/.config" "$USER_HOME/.local/share"; do
     if [ -d "$base_dir" ]; then
         for DIR_PATH in "$base_dir"/*; do
@@ -91,46 +41,66 @@ for base_dir in "$USER_HOME/.config" "$USER_HOME/.local/share"; do
             [[ "$DIR_NAME" =~ $PROTECTED_REGEX ]] && continue
             BASE_NAME="${DIR_NAME%-*}"
             if ! command -v "$DIR_NAME" &> /dev/null && ! command -v "$BASE_NAME" &> /dev/null; then
-                ORPHANS+=("$DIR_PATH")
+                TARGETS+=("$DIR_PATH")
             fi
         done
     fi
 done
 
-while [ ${#ORPHANS[@]} -gt 0 ]; do
-    echo -e "🔍 Found potentially orphaned folders:\n"
-    sudo du -shc "${ORPHANS[@]}" 2>/dev/null | grep -v "total"
-    TOTAL_ORPHAN=$(sudo du -shc "${ORPHANS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
+VALID_TARGETS=()
+for d in "${TARGETS[@]}"; do
+    if sudo sh -c "[ -d \"$d\" ]"; then VALID_TARGETS+=("$d"); fi
+done
+TARGETS=("${VALID_TARGETS[@]}")
+
+while [ ${#TARGETS[@]} -gt 0 ]; do
+    echo -e "🔍 Found disposable caches and orphans:\n\n"
+    sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep -v "total"
+    TOTAL_CACHE=$(sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
     
-    echo -e "\nTotal Orphan Size: \033[1;31m$TOTAL_ORPHAN\033[0m\n"
+    echo -e "\nTotal Wasted Space: \033[1;31m$TOTAL_CACHE\033[0m\n\n"
     
-    echo -e "  1. ✅ \033[1;32mApprove\033[0m & \033[1;31mDelete\033[0m All\n"
+    echo -e "  1. ✅ 🟢 ${GREEN}Approve${NC} & 🔴 ${RED}Delete${NC} All\n\n"
     
-    echo -e "  2. ➕ Add \033[1;33mException\033[0m (Skip a specific folder/keyword)\n"
+    echo -e "  2. ➕ Add 🟡 ${YELLOW}Exception${NC} (Skip a folder)\n\n"
     
-    echo -e "  0. ❌ \033[1;30mSkip\033[0m / \033[1;31mCancel\033[0m Orphans Cleanup\n"
+    echo -e "  0. ❌ ⚪ ${WHITE}Skip${NC} Cleanup\n\n"
     
     read -p "👉 Choice (0-2): " choice
-    echo ""
+    echo -e "\n\n"
     
     if [[ "$choice" == "1" ]]; then
-        rm -rf "${ORPHANS[@]}"
-        echo -e "\033[1;32m[OK] Orphaned folders deleted.\033[0m\n"; break
+        for t in "${TARGETS[@]}"; do sudo rm -rf "$t" 2>/dev/null; done
+        echo -e "  ✅ [OK] 🔴 ${RED}Garbage${NC} cleared.\n\n"; break
     elif [[ "$choice" == "2" ]]; then
-        read -p "✏️  Enter text to exclude (e.g., librewolf): " exc_text
-        echo ""
-        NEW_ORPHANS=()
-        for t in "${ORPHANS[@]}"; do
-            if ! echo "$t" | grep -q -i "$exc_text"; then NEW_ORPHANS+=("$t"); fi
+        read -p "✏️  Enter text to exclude: " exc_text
+        echo -e "\n\n"
+        NEW_TARGETS=()
+        for t in "${TARGETS[@]}"; do
+            if ! echo "$t" | grep -q -i "$exc_text"; then NEW_TARGETS+=("$t"); fi
         done
-        ORPHANS=("${NEW_ORPHANS[@]}")
-        echo -e "\033[1;32m✅ Exception applied!\033[0m\n"
-    elif [[ "$choice" == "0" ]]; then echo -e "\033[1;30m[SKIPPED]\033[0m\n"; break
-    else echo -e "\033[1;31mInvalid choice.\033[0m\n"; fi
+        TARGETS=("${NEW_TARGETS[@]}")
+        echo -e "  ✅ 🟡 ${YELLOW}Exception${NC} applied!\n\n"
+    elif [[ "$choice" == "0" ]]; then echo -e "  ⏭️ [SKIPPED]\n\n"; break
+    else echo -e "  ❌ Invalid choice.\n\n"; fi
 done
 
-echo -e "\033[1;36m========================================\033[0m\n"
+echo -e "  ${YELLOW}[2/2]${NC} ⚙️ Executing System Optimizations...\n\n"
 
-echo -e "\033[1;36m  ✨ Cleanup Completed Successfully!\033[0m\n"
+if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+    dnf autoremove -y >/dev/null 2>&1; dnf makecache -q >/dev/null 2>&1
+elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
+    apt autoremove -y >/dev/null 2>&1; apt update -qq >/dev/null 2>&1
+elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
+    ORPHANS=$(pacman -Qtdq)
+    if [ -n "$ORPHANS" ]; then pacman -Rns $ORPHANS --noconfirm >/dev/null 2>&1; fi
+fi
 
-echo -e "\033[1;36m========================================\033[0m\n"
+if command -v flatpak &> /dev/null; then flatpak uninstall --unused -y >/dev/null 2>&1; fi
+if command -v docker &> /dev/null; then docker builder prune -a -f >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1; fi
+
+journalctl --vacuum-time=3d >/dev/null 2>&1
+
+echo -e "  ✅ System optimizations applied!\n\n"
+
+echo -e "${CYAN}========================================${NC}\n\n"
