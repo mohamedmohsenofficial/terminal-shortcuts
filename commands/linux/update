@@ -1,148 +1,157 @@
 #!/usr/bin/env bash
 
+# Colors for emphasis
 RED='\033[1;31m'; GREEN='\033[1;32m'; YELLOW='\033[1;33m'; CYAN='\033[1;36m'; WHITE='\033[1;37m'; NC='\033[0m'
 
 if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}[ERROR] Please run this script as root (using sudo)${NC}\n\n"
+  echo -e "${RED}[ERROR] Please run this script as root (using sudo)${NC}\n"
   exit 1
 fi
 
 USER_HOME=$(eval echo ~$SUDO_USER)
 [[ -z "$USER_HOME" || "$USER_HOME" == "/" ]] && USER_HOME=$HOME
 
-PROTECTED_REGEX="(code|vscode|codium|docker|containers|podman|distrobox|toolbox|timeshift|ubuntu|arch|fedora|debian|alpine|gtk|dconf|font|pulse|mime|systemd|user-dirs)"
+echo -e "${CYAN}========================================${NC}\n"
 
-echo -e "${CYAN}========================================${NC}\n\n"
+echo -e "  Linux Master Updater & Cleaner\n"
 
-echo -e "  🚀 Linux Master Updater & Cleaner\n\n"
-
-echo -e "${CYAN}========================================${NC}\n\n"
+echo -e "${CYAN}========================================${NC}\n"
 
 if [ -f /etc/os-release ]; then . /etc/os-release; OS=$ID; OS_LIKE=$ID_LIKE; fi
 
-echo -e "  ${YELLOW}[1/3]${NC} 🔵 ${CYAN}Scanning${NC} for OS and App updates...\n\n"
+# 1. Scanning Phase
+echo -e "  ${YELLOW}[1/4]${NC} ${CYAN}Scanning${NC} for OS and App updates...\n"
 
+echo -e "  Checking System Packages...\n"
 if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
     dnf check-update -q || true
 elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
     apt update -qq
     apt list --upgradable 2>/dev/null | head -n 10
+    echo -e "  (Showing top 10 upgradable packages...)\n"
 elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
-    pacman -Qu || echo -e "  ✅ System is up to date.\n\n"
+    pacman -Qu || echo -e "  [OK] System is up to date.\n"
 fi
-echo -e "\n\n"
+echo -e "\n"
 
-if command -v flatpak &> /dev/null; then flatpak remote-ls --updates; fi
-echo -e "\n\n"
+echo -e "  Checking Flatpak Apps...\n"
+if command -v flatpak &> /dev/null; then
+    flatpak remote-ls --updates
+else
+    echo -e "  (Flatpak not installed)\n"
+fi
+echo -e "\n"
 
-if command -v fwupdmgr &> /dev/null; then fwupdmgr get-updates || true; fi
-echo -e "\n\n"
+echo -e "  Checking Firmware...\n"
+if command -v fwupdmgr &> /dev/null; then
+    fwupdmgr get-updates || true
+else
+    echo -e "  (fwupdmgr not installed)\n"
+fi
+echo -e "\n"
 
-echo -e "${CYAN}========================================${NC}\n\n"
+# 2. User Confirmation
+echo -e "${CYAN}========================================${NC}\n"
 
-echo -e "  1. ✅ 🟢 ${GREEN}Approve${NC} & 🟢 ${GREEN}Update${NC} Everything\n\n"
+echo -e "  1. ${GREEN}Approve${NC} & ${GREEN}Update${NC} Everything (OS + Apps)\n"
 
-echo -e "  0. ❌ ⚪ ${WHITE}Skip${NC} / ${RED}Cancel${NC} Updates\n\n"
+echo -e "  0. ${WHITE}Skip${NC} / ${RED}Cancel${NC} Updates\n"
 
-read -p "👉 Choice (0-1): " update_choice
-echo -e "\n\n"
+read -p "  Choice (0-1): " choice
+echo -e "\n"
 
-if [[ "$update_choice" == "1" ]]; then
-    echo -e "  ⏳ Executing 🟢 ${GREEN}Updates${NC}...\n\n"
+if [[ "$choice" == "1" ]]; then
+    
+    # 3. Executing Updates
+    echo -e "  ${YELLOW}[2/4]${NC} Executing ${GREEN}Updates${NC}...\n"
+    
     if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-        dnf upgrade --refresh -y; dnf update -y
+        dnf upgrade --refresh -y
+        dnf update -y
     elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
-        apt upgrade -y; apt full-upgrade -y
+        apt upgrade -y
+        apt full-upgrade -y
     elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
         pacman -Syu --noconfirm
     fi
-    if command -v flatpak &> /dev/null; then flatpak update -y; fi
-    if command -v fwupdmgr &> /dev/null; then fwupdmgr refresh --force; fwupdmgr update -y; fi
-    echo -e "\n  ✅ Updates completed!\n\n"
-else
-    echo -e "  ⏭️ ⚪ ${WHITE}Pending${NC} updates skipped.\n\n"
-fi
+    echo -e "\n  [OK] OS updated successfully!\n"
 
-echo -e "  ${YELLOW}[2/3]${NC} 🔵 ${CYAN}Scanning${NC} 🔴 ${RED}Garbage${NC} & Orphans...\n\n"
-
-TARGETS=("/var/spool/abrt" "/var/crash" "/var/lib/systemd/coredump" "$USER_HOME/.cache/thumbnails")
-if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then TARGETS+=("/var/cache/dnf")
-elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then TARGETS+=("/var/cache/apt/archives")
-elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then TARGETS+=("/var/cache/pacman/pkg"); fi
-
-if [ -d "$USER_HOME/.cache" ]; then
-    while IFS= read -r -d '' dir; do TARGETS+=("$dir")
-    done < <(find "$USER_HOME/.cache" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | grep -z -E -v -i "$PROTECTED_REGEX")
-fi
-
-for base_dir in "$USER_HOME/.config" "$USER_HOME/.local/share"; do
-    if [ -d "$base_dir" ]; then
-        for DIR_PATH in "$base_dir"/*; do
-            [ ! -d "$DIR_PATH" ] && continue
-            DIR_NAME=$(basename "$DIR_PATH" | tr '[:upper:]' '[:lower:]')
-            [[ "$DIR_NAME" =~ $PROTECTED_REGEX ]] && continue
-            BASE_NAME="${DIR_NAME%-*}"
-            if ! command -v "$DIR_NAME" &> /dev/null && ! command -v "$BASE_NAME" &> /dev/null; then
-                TARGETS+=("$DIR_PATH")
-            fi
-        done
+    if command -v flatpak &> /dev/null; then
+        echo -e "  Updating Flatpak applications...\n"
+        flatpak update -y
     fi
-done
 
-VALID_TARGETS=()
-for d in "${TARGETS[@]}"; do
-    if sudo sh -c "[ -d \"$d\" ]"; then VALID_TARGETS+=("$d"); fi
-done
-TARGETS=("${VALID_TARGETS[@]}")
+    if command -v fwupdmgr &> /dev/null; then
+        echo -e "\n  Updating Firmware...\n"
+        fwupdmgr refresh --force
+        fwupdmgr update -y
+    fi
 
-while [ ${#TARGETS[@]} -gt 0 ]; do
-    echo -e "🔍 Found disposable caches and orphans:\n\n"
-    sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep -v "total"
-    TOTAL_CACHE=$(sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
+    # 4. Cleaning Garbage & Applying User Original Commands
+    echo -e "\n  ${YELLOW}[3/4]${NC} Cleaning ${RED}Garbage${NC} & Rebuilding Caches...\n"
     
-    echo -e "\nTotal Wasted Space: \033[1;31m$TOTAL_CACHE\033[0m\n\n"
-    
-    echo -e "  1. ✅ 🟢 ${GREEN}Approve${NC} & 🔴 ${RED}Delete${NC} All\n\n"
-    
-    echo -e "  2. ➕ Add 🟡 ${YELLOW}Exception${NC} (Skip a folder)\n\n"
-    
-    echo -e "  0. ❌ ⚪ ${WHITE}Skip${NC} Cleanup\n\n"
-    
-    read -p "👉 Choice (0-2): " choice
-    echo -e "\n\n"
-    
-    if [[ "$choice" == "1" ]]; then
-        for t in "${TARGETS[@]}"; do sudo rm -rf "$t" 2>/dev/null; done
-        echo -e "  ✅ [OK] 🔴 ${RED}Garbage${NC} cleared.\n\n"; break
-    elif [[ "$choice" == "2" ]]; then
-        read -p "✏️  Enter text to exclude: " exc_text
-        echo -e "\n\n"
-        NEW_TARGETS=()
-        for t in "${TARGETS[@]}"; do
-            if ! echo "$t" | grep -q -i "$exc_text"; then NEW_TARGETS+=("$t"); fi
-        done
-        TARGETS=("${NEW_TARGETS[@]}")
-        echo -e "  ✅ 🟡 ${YELLOW}Exception${NC} applied!\n\n"
-    elif [[ "$choice" == "0" ]]; then echo -e "  ⏭️ [SKIPPED]\n\n"; break
-    else echo -e "  ❌ Invalid choice.\n\n"; fi
-done
+    if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+        dnf autoremove -y
+        dnf clean all
+        rm -rf /var/cache/dnf/*
+        dnf makecache
+        dnf check-update || true
+    elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
+        apt autoremove -y
+        apt autoclean -y
+        apt clean
+        rm -rf /var/cache/apt/archives/*
+        apt update -qq
+    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
+        ORPHANS=$(pacman -Qtdq)
+        if [ -n "$ORPHANS" ]; then pacman -Rns $ORPHANS --noconfirm; fi
+        pacman -Sc --noconfirm
+        rm -rf /var/cache/pacman/pkg/*
+    fi
 
-echo -e "  ${YELLOW}[3/3]${NC} ⚙️ Executing System Optimizations...\n\n"
+    if command -v flatpak &> /dev/null; then
+        flatpak uninstall --unused -y
+    fi
 
-if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-    dnf autoremove -y >/dev/null 2>&1; dnf makecache -q >/dev/null 2>&1
-elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
-    apt autoremove -y >/dev/null 2>&1; apt update -qq >/dev/null 2>&1
-elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
-    ORPHANS=$(pacman -Qtdq)
-    if [ -n "$ORPHANS" ]; then pacman -Rns $ORPHANS --noconfirm >/dev/null 2>&1; fi
+    echo -e "\n  Cleaning Thumbnails...\n"
+    rm -rf "$USER_HOME/.cache/thumbnails/"*
+
+    echo -e "\n  Vacuuming Journal Logs (Keeping last 3 days)...\n"
+    journalctl --vacuum-time=3d
+
+    echo -e "\n  Configuring Journal Size Limit (50M)...\n"
+    if [ -f /etc/systemd/journald.conf ]; then
+        sed -i 's/.*SystemMaxUse=.*/SystemMaxUse=50M/' /etc/systemd/journald.conf
+        systemctl restart systemd-journald
+    fi
+
+    echo -e "\n  Cleaning ABRT and Coredump logs...\n"
+    rm -rf /var/spool/abrt/*
+    rm -rf /var/lib/systemd/coredump/*
+
+    # 5. Final Output & Sizes
+    echo -e "\n  ${YELLOW}[4/4]${NC} System Report:\n"
+    
+    if command -v fwupdmgr &> /dev/null; then
+        echo -e "  Firmware Update History:\n"
+        fwupdtool get-history | head -n 15
+        echo -e "\n"
+    fi
+
+    echo -e "  Cache Size After Cleanup:\n"
+    if [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+        du -sh /var/cache/dnf 2>/dev/null || echo "0"
+    elif [[ "$OS" == "debian" || "$OS" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; then
+        du -sh /var/cache/apt/archives 2>/dev/null || echo "0"
+    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* ]]; then
+        du -sh /var/cache/pacman/pkg 2>/dev/null || echo "0"
+    fi
+    echo -e "\n"
+
+    echo -e "  [OK] System Update, Cleanup, and Cache Refresh Complete!\n"
+
+else
+    echo -e "  [SKIPPED] ${WHITE}Pending${NC} updates were skipped.\n"
 fi
 
-if command -v flatpak &> /dev/null; then flatpak uninstall --unused -y >/dev/null 2>&1; fi
-if command -v docker &> /dev/null; then docker builder prune -a -f >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1; fi
-
-journalctl --vacuum-time=3d >/dev/null 2>&1
-
-echo -e "  ✅ System optimizations applied!\n\n"
-
-echo -e "${CYAN}========================================${NC}\n\n"
+echo -e "${CYAN}========================================${NC}\n"
