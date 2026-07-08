@@ -1,19 +1,36 @@
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  🚀 Windows Intelligent System Cleaner" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
+Set-ExecutionPolicy Bypass -Scope Process -Force
+$E = [char]27
+$Red = "$E[1;31m"; $Green = "$E[1;32m"; $Yellow = "$E[1;33m"; $Cyan = "$E[1;36m"; $White = "$E[1;37m"; $Rst = "$E[0m"
 
-# 5. Strict Protection (Diplomatic Immunity)
 $PROTECTED_REGEX = "(?i)(Microsoft|Windows|System|Code|vscode|codium|docker|containers|podman|wsl|ubuntu|kali|debian|intel|amd|nvidia|google)"
 
-# 1. OS Roots & Deep Cache
-Write-Host "`n[1/3] Scanning Temp & OS Cache...`n" -ForegroundColor Yellow
+Write-Host "$Cyan========================================$Rst`n`n"
 
-$CACHE_TARGETS = @("$env:TEMP\*", "C:\Windows\Temp\*", "C:\Windows\SoftwareDistribution\Download\*")
+Write-Host "  🚀 Windows Master Cleaner`n`n"
 
-while ($CACHE_TARGETS.Count -gt 0) {
+Write-Host "$Cyan========================================$Rst`n`n"
+
+Write-Host "  $Yellow[1/2]$Rst 🔵 $Cyan Scanning $Rst 🔴 $Red Garbage $Rst & Orphans...`n`n"
+
+$TARGETS = @("$env:TEMP\*", "C:\Windows\Temp\*", "C:\Windows\SoftwareDistribution\Download\*")
+
+$appDataPaths = @($env:APPDATA, $env:LOCALAPPDATA)
+foreach ($baseDir in $appDataPaths) {
+    $folders = Get-ChildItem -Path $baseDir -Directory -ErrorAction SilentlyContinue
+    foreach ($folder in $folders) {
+        if ($folder.Name -match $PROTECTED_REGEX) { continue }
+        $progPath1 = Join-Path "C:\Program Files" $folder.Name
+        $progPath2 = Join-Path "C:\Program Files (x86)" $folder.Name
+        if (-not (Test-Path $progPath1) -and -not (Test-Path $progPath2)) {
+            $TARGETS += $folder.FullName
+        }
+    }
+}
+
+while ($TARGETS.Count -gt 0) {
     $sizeBytes = 0
-    Write-Host "🔍 Found disposable cache directories:`n"
-    foreach ($p in $CACHE_TARGETS) {
+    Write-Host "🔍 Found disposable caches and orphans:`n`n"
+    foreach ($p in $TARGETS) {
         $parentPath = Split-Path $p
         $leafPath = Split-Path $p -Leaf
         if (Test-Path $parentPath) {
@@ -22,121 +39,47 @@ while ($CACHE_TARGETS.Count -gt 0) {
                 $sum = ($items | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum 
                 $sizeBytes += $sum
                 $folderMB = [math]::Round($sum / 1MB, 2)
-                Write-Host " -> $parentPath ($folderMB MB)`n"
+                Write-Host " -> $parentPath ($folderMB MB)`n`n"
             }
         }
     }
 
     $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
-    if ($sizeMB -eq 0) { 
-        Write-Host "[OK] Cache is clean.`n" -ForegroundColor Green
-        break 
-    }
+    if ($sizeMB -eq 0) { Write-Host "  ✅ [OK] Clean.`n`n" -ForegroundColor Green; break }
 
-    Write-Host "Total Cache Size: $sizeMB MB`n" -ForegroundColor Green
+    Write-Host "Total Wasted Space: $sizeMB MB`n`n" -ForegroundColor Red
     
-    Write-Host "  1. ✅ " -NoNewline; Write-Host "Approve" -ForegroundColor Green -NoNewline; Write-Host " & " -NoNewline; Write-Host "Delete" -ForegroundColor Red -NoNewline; Write-Host " All`n"
+    Write-Host "  1. ✅ 🟢 $Green Approve $Rst & 🔴 $Red Delete $Rst All`n`n"
     
-    Write-Host "  2. ➕ Add " -NoNewline; Write-Host "Exception" -ForegroundColor Yellow -NoNewline; Write-Host " (Skip a specific folder/keyword)`n"
+    Write-Host "  2. ➕ Add 🟡 $Yellow Exception $Rst (Skip a folder)`n`n"
     
-    Write-Host "  0. ❌ " -NoNewline; Write-Host "Skip" -ForegroundColor Gray -NoNewline; Write-Host " / " -NoNewline; Write-Host "Cancel" -ForegroundColor Red -NoNewline; Write-Host " Caches Cleanup`n"
+    Write-Host "  0. ❌ ⚪ $White Skip $Rst Cleanup`n`n"
     
-    $choice = Read-Host "👉 Choice (0-2)"
-    Write-Host ""
+    $choice2 = Read-Host "👉 Choice (0-2)"
+    Write-Host "`n`n"
 
-    if ($choice -eq "1") {
-        foreach ($p in $CACHE_TARGETS) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
-        Write-Host "[OK] Caches cleared.`n" -ForegroundColor Green
+    if ($choice2 -eq "1") {
+        foreach ($p in $TARGETS) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
+        Write-Host "  ✅ [OK] 🔴 $Red Garbage $Rst cleared.`n`n"
         break
-    } elseif ($choice -eq "2") {
+    } elseif ($choice2 -eq "2") {
         $excText = Read-Host "✏️ Enter text to exclude"
-        Write-Host ""
+        Write-Host "`n`n"
         $newTargets = @()
-        foreach ($t in $CACHE_TARGETS) { if ($t -notmatch $excText) { $newTargets += $t } }
-        $CACHE_TARGETS = $newTargets
-        Write-Host "✅ Exception applied!`n" -ForegroundColor Green
-    } elseif ($choice -eq "0") { 
-        Write-Host "[SKIPPED]`n" -ForegroundColor Gray
+        foreach ($t in $TARGETS) { if ($t -notmatch $excText) { $newTargets += $t } }
+        $TARGETS = $newTargets
+        Write-Host "  ✅ 🟡 $Yellow Exception $Rst applied!`n`n"
+    } elseif ($choice2 -eq "0") { 
+        Write-Host "  ⏭️ [SKIPPED]`n`n"
         break 
-    } else {
-        Write-Host "Invalid choice.`n" -ForegroundColor Red
     }
 }
 
-# 4. Orphaned Folders Radar (AppData vs Program Files)
-Write-Host "[2/3] Scanning for Orphaned Config Folders (AppData)...`n" -ForegroundColor Yellow
-
-$ORPHANS = @()
-$appDataPaths = @($env:APPDATA, $env:LOCALAPPDATA)
-
-foreach ($baseDir in $appDataPaths) {
-    $folders = Get-ChildItem -Path $baseDir -Directory -ErrorAction SilentlyContinue
-    foreach ($folder in $folders) {
-        if ($folder.Name -match $PROTECTED_REGEX) { continue }
-        
-        # Check if corresponding app exists in Program Files
-        $progPath1 = Join-Path "C:\Program Files" $folder.Name
-        $progPath2 = Join-Path "C:\Program Files (x86)" $folder.Name
-        if (-not (Test-Path $progPath1) -and -not (Test-Path $progPath2)) {
-            $ORPHANS += $folder.FullName
-        }
-    }
-}
-
-while ($ORPHANS.Count -gt 0) {
-    $sizeBytes = 0
-    Write-Host "🔍 Found potentially orphaned folders:`n"
-    foreach ($p in $ORPHANS) {
-        $sum = (Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
-        $sizeBytes += $sum
-        $folderMB = [math]::Round($sum / 1MB, 2)
-        Write-Host " -> $p ($folderMB MB)`n"
-    }
-
-    $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
-    if ($sizeMB -eq 0) { break }
-
-    Write-Host "Total Orphan Size: $sizeMB MB`n" -ForegroundColor Red
-    
-    Write-Host "  1. ✅ " -NoNewline; Write-Host "Approve" -ForegroundColor Green -NoNewline; Write-Host " & " -NoNewline; Write-Host "Delete" -ForegroundColor Red -NoNewline; Write-Host " All`n"
-    
-    Write-Host "  2. ➕ Add " -NoNewline; Write-Host "Exception" -ForegroundColor Yellow -NoNewline; Write-Host " (Skip a specific folder/keyword)`n"
-    
-    Write-Host "  0. ❌ " -NoNewline; Write-Host "Skip" -ForegroundColor Gray -NoNewline; Write-Host " / " -NoNewline; Write-Host "Cancel" -ForegroundColor Red -NoNewline; Write-Host " Orphans Cleanup`n"
-    
-    $choice = Read-Host "👉 Choice (0-2)"
-    Write-Host ""
-
-    if ($choice -eq "1") {
-        foreach ($p in $ORPHANS) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue }
-        Write-Host "[OK] Orphaned folders deleted.`n" -ForegroundColor Green
-        break
-    } elseif ($choice -eq "2") {
-        $excText = Read-Host "✏️ Enter text to exclude"
-        Write-Host ""
-        $newOrphans = @()
-        foreach ($t in $ORPHANS) { if ($t -notmatch $excText) { $newOrphans += $t } }
-        $ORPHANS = $newOrphans
-        Write-Host "✅ Exception applied!`n" -ForegroundColor Green
-    } elseif ($choice -eq "0") { 
-        Write-Host "[SKIPPED]`n" -ForegroundColor Gray
-        break 
-    } else {
-        Write-Host "Invalid choice.`n" -ForegroundColor Red
-    }
-}
-
-# 2. Containers Cleanup
-Write-Host "[3/3] Cleaning Docker Remnants...`n" -ForegroundColor Yellow
-
+Write-Host "  $Yellow[2/2]$Rst ⚙️ Executing System Optimizations...`n`n"
 If (Get-Command docker -ErrorAction SilentlyContinue) {
-    docker builder prune -a
-    docker image prune
-    Write-Host "`n"
-} else { 
-    Write-Host "[SKIPPED] Docker not found.`n" -ForegroundColor Gray 
+    docker builder prune -a -f | Out-Null
+    docker image prune -f | Out-Null
 }
+Write-Host "  ✅ System optimizations applied!`n`n"
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  ✨ Cleanup Completed Successfully!" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "$Cyan========================================$Rst`n`n"
