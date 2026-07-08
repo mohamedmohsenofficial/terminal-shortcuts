@@ -1,7 +1,6 @@
-
 # Terminal Shortcuts
 
-A lightweight collection of one-word terminal commands for **Linux** and **macOS**.
+A lightweight collection of one-word terminal commands for **Linux**, **macOS**, and **Windows**.
 
 Run common system tasks using memorable commands instead of long command sequences.
 
@@ -15,7 +14,7 @@ or
 cleaner
 ```
 
-Every command is an independent shell script that automates one or more terminal tasks.
+Every command is an independent shell script or PowerShell script that automates one or more terminal tasks.
 
 ---
 
@@ -24,6 +23,7 @@ Every command is an independent shell script that automates one or more terminal
 - One-word commands
 - Linux support
 - macOS support
+- Windows support
 - One-command installation
 - Lightweight
 - Easy customization
@@ -34,6 +34,8 @@ Every command is an independent shell script that automates one or more terminal
 
 # Compatibility
 
+- Windows 10
+- Windows 11
 - Fedora
 - Ubuntu
 - Debian
@@ -53,7 +55,7 @@ Instead of remembering long command sequences, simply type a single command such
 update
 ```
 
-The goal of this project is to provide clean, memorable shortcuts that simplify everyday terminal usage.
+The goal of this project is to provide clean, memorable shortcuts that simplify everyday terminal usage across different operating systems while keeping everything lightweight and easy to maintain.
 
 ---
 
@@ -71,17 +73,27 @@ bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/termin
 bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-macos.sh)
 ```
 
-The installer automatically:
+## Windows
+
+Run **PowerShell as Administrator**:
+
+```powershell
+irm https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-windows.ps1 | iex
+```
+
+Each installer automatically:
 
 - Downloads the latest version
 - Installs every available command
-- Makes commands executable
-- Creates symbolic links
-- Adds `~/.local/bin` to your PATH (if needed)
+- Makes commands executable (Linux/macOS)
+- Creates symbolic links or PowerShell wrappers
+- Adds the installation directory to your PATH (if needed)
 
 ---
 
 # Manual Installation
+
+## Linux / macOS
 
 Copy the command you want into `~/.local/bin`:
 
@@ -96,40 +108,79 @@ Run it:
 update
 ```
 
+## Windows
+
+Copy any PowerShell command from:
+
+```text
+commands/windows/
+```
+
+to a directory included in your `PATH`, or simply use the installer.
+
+Example:
+
+```powershell
+update
+```
+
 ---
 
 # Updating
 
 Run the installer again.
 
-Linux:
+## Linux
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-linux.sh)
 ```
 
-macOS:
+## macOS
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-macos.sh)
+```
+
+## Windows
+
+```powershell
+irm https://raw.githubusercontent.com/mohamedmohsenofficial/terminal-shortcuts/main/install/install-windows.ps1 | iex
 ```
 
 ---
 
 # Uninstall
 
+## Linux / macOS
+
 ```bash
 bash ~/.terminal-shortcuts/install/uninstall.sh
+```
+
+## Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File uninstall-windows.ps1
 ```
 
 ---
 
 # Usage
 
+Linux / macOS:
+
 ```bash
 update
 cleaner
 repair
+```
+
+Windows PowerShell:
+
+```powershell
+update
+cleaner
 ```
 
 Example:
@@ -162,16 +213,23 @@ terminal-shortcuts/
 │   │   ├── repair
 │   │   └── ...
 │   │
-│   └── macos/
-│       ├── update
-│       ├── cleaner
-│       ├── repair
+│   ├── macos/
+│   │   ├── update
+│   │   ├── cleaner
+│   │   ├── repair
+│   │   └── ...
+│   │
+│   └── windows/
+│       ├── update.ps1
+│       ├── cleaner.ps1
 │       └── ...
 │
 ├── install/
 │   ├── install-linux.sh
 │   ├── install-macos.sh
-│   └── uninstall.sh
+│   ├── install-windows.ps1
+│   ├── uninstall.sh
+│   └── uninstall-windows.ps1
 │
 ├── README.md
 ├── LICENSE
@@ -182,46 +240,80 @@ terminal-shortcuts/
 
 # Creating a New Command
 
-1. Create a new executable file inside:
+1. Create a new command inside one of these directories:
 
 ```text
 commands/linux/
-```
-
-or
-
-```text
 commands/macos/
+commands/windows/
 ```
 
-2. Add your shell commands.
-3. Make it executable:
+2. Add your shell or PowerShell commands.
+
+3. Make it executable if required.
+
+Linux / macOS:
 
 ```bash
 chmod +x your-command
 ```
 
+Windows:
+
+Save the command as a `.ps1` file.
+
 4. Run the installer again.
 
-The installer automatically installs every new command.
+The installer automatically installs every new command available for your operating system.
 
 ---
 
 # Contributing
 
-Contributions are welcome.
+Contributions of all sizes are always welcome.
 
-You can:
+The goal of this project is simple:
 
-- Add a new command
-- Improve an existing command
+Make the terminal easier, more approachable, and less intimidating for everyone.
+
+Whether you're an experienced developer or someone writing their very first script, your contribution matters.
+
+You can help by:
+
+- Add new commands
+- Improve existing commands
 - Fix bugs
 - Improve documentation
-- Support more Linux distributions
+- Support additional Linux distributions
 - Improve macOS compatibility
+- Expand Windows support
 - Suggest new ideas
 
-Open an Issue or submit a Pull Request.
+This project is built around the spirit of open source.
+
+We believe software should be open, accessible, and easy to understand.
+
+If this project helps even one new Linux user feel more comfortable using the terminal, then it has achieved its purpose.
+
+Everyone is welcome here.
+
+Open an Issue, submit a Pull Request, or simply share your ideas.
+
+---
+
+# Community
+
+Terminal Shortcuts is more than a collection of scripts.
+
+It is an open-source community effort to make everyday terminal tasks simpler and more accessible.
+
+Many people are interested in Linux and open-source software but are discouraged by long commands and a steep learning curve.
+
+This project aims to remove that barrier by replacing complex command sequences with simple, memorable commands.
+
+Every contribution—whether it's code, documentation, bug reports, testing, translations, or ideas—helps make the terminal friendlier for newcomers while remaining useful for experienced users.
+
+Together, we can make open-source software easier to learn, easier to use, and easier to share.
 
 ---
 
@@ -234,6 +326,9 @@ Open an Issue or submit a Pull Request.
 - Configuration file
 - Package manager detection
 - Better documentation
+- More Windows commands
+- More macOS commands
+- More Linux distributions
 
 ---
 
@@ -263,4 +358,4 @@ Built for my own workflow and shared with the open-source community.
 
 If this project saves you time or simplifies your daily terminal workflow, then it has achieved its purpose.
 
-Built with passion for developers, power users, and terminal enthusiasts.
+Built with passion for developers, Linux users, Windows users, macOS users, terminal enthusiasts, and everyone who believes in open source, software freedom, and the joy of learning, building, and sharing.
