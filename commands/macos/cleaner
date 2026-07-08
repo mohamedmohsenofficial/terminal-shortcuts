@@ -1,129 +1,70 @@
 #!/usr/bin/env bash
 
-# 5. Strict Protection (Diplomatic Immunity)
+RED='\033[1;31m'; GREEN='\033[1;32m'; YELLOW='\033[1;33m'; CYAN='\033[1;36m'; WHITE='\033[1;37m'; NC='\033[0m'
 PROTECTED_REGEX="(code|vscode|codium|docker|containers|apple|system|crashreporter|mobilesync|homebrew|safari)"
 
-echo -e "\033[1;36m========================================\033[0m\n"
+echo -e "${CYAN}========================================${NC}\n\n"
 
-echo -e "\033[1;36m  🚀 macOS Intelligent System Cleaner\033[0m\n"
+echo -e "  🚀 macOS Master Cleaner\n\n"
 
-echo -e "\033[1;36m========================================\033[0m\n"
+echo -e "${CYAN}========================================${NC}\n\n"
 
-# 1. Package Manager (Homebrew)
-echo -e "\033[1;33m[1/4] Cleaning Package Manager (Homebrew)...\033[0m\n"
-if command -v brew &> /dev/null; then
-    brew autoremove
-    BREW_CACHE=$(brew --cache)
-    CACHE_SIZE=$(du -sh "$BREW_CACHE" 2>/dev/null | awk '{print $1}')
-    
-    echo -e "Homebrew Cache Size: \033[1;31m$CACHE_SIZE\033[0m\n"
-    
-    echo -e "  1. ✅ \033[1;32mClear\033[0m Homebrew Cache\n"
-    
-    echo -e "  0. ❌ \033[1;30mSkip\033[0m\n"
-    
-    read -p "👉 Choice (0-1): " conf_brew
-    echo ""
-    
-    if [[ "$conf_brew" == "1" ]]; then brew cleanup -s; fi
-fi
+echo -e "  ${YELLOW}[1/2]${NC} 🔵 ${CYAN}Scanning${NC} 🔴 ${RED}Garbage${NC} & Caches...\n\n"
 
-# 3. Deep Cache
-echo -e "\033[1;33m[2/4] Scanning System Caches...\033[0m\n"
 TARGETS=()
+if command -v brew &> /dev/null; then TARGETS+=("$(brew --cache)"); fi
+
 while IFS= read -r -d '' dir; do TARGETS+=("$dir")
 done < <(find ~/Library/Caches -mindepth 1 -maxdepth 1 -print0 2>/dev/null | grep -z -E -v -i "$PROTECTED_REGEX")
 
+if [ -d "$HOME/Library/Application Support" ]; then
+    for DIR_PATH in "$HOME/Library/Application Support"/*; do
+        [ ! -d "$DIR_PATH" ] && continue
+        DIR_NAME=$(basename "$DIR_PATH")
+        if echo "$DIR_NAME" | grep -q -E -i "$PROTECTED_REGEX"; then continue; fi
+        APP_EXISTS=$(find /Applications -maxdepth 2 -iname "*${DIR_NAME}*.app" 2>/dev/null)
+        if [ -z "$APP_EXISTS" ]; then TARGETS+=("$DIR_PATH"); fi
+    done
+fi
+
 while [ ${#TARGETS[@]} -gt 0 ]; do
-    echo -e "🔍 Found Caches:\n"
-    du -shc "${TARGETS[@]}" 2>/dev/null | grep -v "total"
-    TOTAL_MAC=$(du -shc "${TARGETS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
+    echo -e "🔍 Found disposable caches and orphans:\n\n"
+    sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep -v "total"
+    TOTAL_CACHE=$(sudo du -shc "${TARGETS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
     
-    echo -e "\nTotal System Cache Size: \033[1;32m$TOTAL_MAC\033[0m\n"
+    echo -e "\nTotal Wasted Space: \033[1;31m$TOTAL_CACHE\033[0m\n\n"
     
-    echo -e "  1. ✅ \033[1;32mApprove\033[0m & \033[1;31mDelete\033[0m All\n"
+    echo -e "  1. ✅ 🟢 ${GREEN}Approve${NC} & 🔴 ${RED}Delete${NC} All\n\n"
     
-    echo -e "  2. ➕ Add \033[1;33mException\033[0m (Skip a specific folder/keyword)\n"
+    echo -e "  2. ➕ Add 🟡 ${YELLOW}Exception${NC} (Skip a folder)\n\n"
     
-    echo -e "  0. ❌ \033[1;30mSkip\033[0m / \033[1;31mCancel\033[0m Caches Cleanup\n"
+    echo -e "  0. ❌ ⚪ ${WHITE}Skip${NC} Cleanup\n\n"
     
     read -p "👉 Choice (0-2): " choice
-    echo ""
+    echo -e "\n\n"
     
     if [[ "$choice" == "1" ]]; then
-        for t in "${TARGETS[@]}"; do rm -rf "$t" 2>/dev/null; done
-        echo -e "\033[1;32m[OK] System cache cleared.\033[0m\n"; break
+        for t in "${TARGETS[@]}"; do sudo rm -rf "$t" 2>/dev/null; done
+        echo -e "  ✅ [OK] 🔴 ${RED}Garbage${NC} cleared.\n\n"; break
     elif [[ "$choice" == "2" ]]; then
-        read -p "✏️  Enter text to exclude (e.g., chrome): " exc_text
-        echo ""
+        read -p "✏️  Enter text to exclude: " exc_text
+        echo -e "\n\n"
         NEW_TARGETS=()
         for t in "${TARGETS[@]}"; do
             if ! echo "$t" | grep -q -i "$exc_text"; then NEW_TARGETS+=("$t"); fi
         done
         TARGETS=("${NEW_TARGETS[@]}")
-        echo -e "\033[1;32m✅ Exception applied!\033[0m\n"
-    elif [[ "$choice" == "0" ]]; then echo -e "\033[1;30m[SKIPPED]\033[0m\n"; break
-    else echo -e "\033[1;31mInvalid choice.\033[0m\n"; fi
+        echo -e "  ✅ 🟡 ${YELLOW}Exception${NC} applied!\n\n"
+    elif [[ "$choice" == "0" ]]; then echo -e "  ⏭️ [SKIPPED]\n\n"; break
+    else echo -e "  ❌ Invalid choice.\n\n"; fi
 done
 
-# 4. Orphaned Folders Radar (Mac Edition)
-echo -e "\033[1;33m[3/4] Scanning for Orphaned Config Folders...\033[0m\n"
-ORPHANS=()
-if [ -d "$HOME/Library/Application Support" ]; then
-    for DIR_PATH in "$HOME/Library/Application Support"/*; do
-        [ ! -d "$DIR_PATH" ] && continue
-        DIR_NAME=$(basename "$DIR_PATH")
-        
-        if echo "$DIR_NAME" | grep -q -E -i "$PROTECTED_REGEX"; then continue; fi
-        
-        # Check if a matching App exists in /Applications
-        APP_EXISTS=$(find /Applications -maxdepth 2 -iname "*${DIR_NAME}*.app" 2>/dev/null)
-        if [ -z "$APP_EXISTS" ]; then ORPHANS+=("$DIR_PATH"); fi
-    done
-fi
+echo -e "  ${YELLOW}[2/2]${NC} ⚙️ Executing System Optimizations...\n\n"
 
-while [ ${#ORPHANS[@]} -gt 0 ]; do
-    echo -e "🔍 Found potentially orphaned folders:\n"
-    du -shc "${ORPHANS[@]}" 2>/dev/null | grep -v "total"
-    TOTAL_ORPHAN=$(du -shc "${ORPHANS[@]}" 2>/dev/null | grep "total" | awk '{print $1}')
-    
-    echo -e "\nTotal Orphan Size: \033[1;31m$TOTAL_ORPHAN\033[0m\n"
-    
-    echo -e "  1. ✅ \033[1;32mApprove\033[0m & \033[1;31mDelete\033[0m All\n"
-    
-    echo -e "  2. ➕ Add \033[1;33mException\033[0m (Skip a specific folder/keyword)\n"
-    
-    echo -e "  0. ❌ \033[1;30mSkip\033[0m / \033[1;31mCancel\033[0m Orphans Cleanup\n"
-    
-    read -p "👉 Choice (0-2): " choice
-    echo ""
-    
-    if [[ "$choice" == "1" ]]; then
-        rm -rf "${ORPHANS[@]}"
-        echo -e "\033[1;32m[OK] Orphaned folders deleted.\033[0m\n"; break
-    elif [[ "$choice" == "2" ]]; then
-        read -p "✏️  Enter text to exclude: " exc_text
-        echo ""
-        NEW_ORPHANS=()
-        for t in "${ORPHANS[@]}"; do
-            if ! echo "$t" | grep -q -i "$exc_text"; then NEW_ORPHANS+=("$t"); fi
-        done
-        ORPHANS=("${NEW_ORPHANS[@]}")
-        echo -e "\033[1;32m✅ Exception applied!\033[0m\n"
-    elif [[ "$choice" == "0" ]]; then echo -e "\033[1;30m[SKIPPED]\033[0m\n"; break
-    else echo -e "\033[1;31mInvalid choice.\033[0m\n"; fi
-done
+if command -v brew &> /dev/null; then brew autoremove >/dev/null 2>&1; brew cleanup -s >/dev/null 2>&1; fi
+if command -v docker &> /dev/null; then docker builder prune -a -f >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1; fi
+sudo rm -rf /Library/Updates/* 2>/dev/null
 
-# 2. Containers Cleanup
-echo -e "\033[1;33m[4/4] Cleaning Docker Remnants...\033[0m\n"
-if command -v docker &> /dev/null; then
-    docker builder prune -a; docker image prune
-else
-    echo -e "\033[1;30m[SKIPPED] Docker not found.\033[0m\n"
-fi
+echo -e "  ✅ System optimizations applied!\n\n"
 
-echo -e "\033[1;36m========================================\033[0m\n"
-
-echo -e "\033[1;36m  ✨ Cleanup Completed Successfully!\033[0m\n"
-
-echo -e "\033[1;36m========================================\033[0m\n"
+echo -e "${CYAN}========================================${NC}\n\n"
