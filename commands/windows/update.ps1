@@ -7,6 +7,22 @@ Write-Host "  Windows Master Updater & Cleaner`n`n"
 
 Write-Host "$Cyan========================================$Rst`n`n"
 
+$E = [char]27
+$Red = "$E[1;31m"
+$Green = "$E[1;32m"
+$Yellow = "$E[1;33m"
+$Cyan = "$E[1;36m"
+$White = "$E[1;37m"
+$Rst = "$E[0m"
+
+# Auto Update Terminal Shortcuts
+if (Get-Command update-terminal-shortcuts -ErrorAction SilentlyContinue) {
+    update-terminal-shortcuts
+}
+
+Write-Host "$Cyan========================================$Rst`n`n"
+
+
 # 1. Checking Dependencies
 Write-Host "  $Yellow[1/4]$Rst Checking required update modules...`n`n"
 
