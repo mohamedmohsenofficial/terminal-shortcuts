@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 scan_os() {
     # Define colors for output
     local RED="\e[31m"
