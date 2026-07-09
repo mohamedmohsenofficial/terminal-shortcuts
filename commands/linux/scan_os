@@ -208,3 +208,4 @@ scan_os() {
     printf "%-15s | %-15s | %-8s | %s\n" "TOTAL SCORE" "System" "${total_score}/${max_score}" "Health Check Completed"
     echo
 }
+scan_os "$@"
