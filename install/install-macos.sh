@@ -57,6 +57,10 @@ do
     sudo install -m755 "$cmd" "$BIN_DIR/$(basename "$cmd")"
 done
 
+sudo install -m755 \
+"$INSTALL_DIR/install/update-terminal-shortcuts.sh" \
+"$BIN_DIR/update-terminal-shortcuts"
+
 # --------------------------------------------------
 # Finish
 # --------------------------------------------------
