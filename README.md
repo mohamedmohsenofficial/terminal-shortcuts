@@ -128,7 +128,28 @@ update
 
 # Updating
 
-Run the installer again.
+## Automatic Updates
+
+Terminal Shortcuts automatically checks for updates every time you run any command.
+
+If a newer version is available on GitHub, it is downloaded and installed automatically before the command continues.
+
+This process runs silently in the background and does **not** interrupt your workflow.
+
+Example:
+
+```text
+$ update
+
+Running some updates to keep Terminal Shortcuts healthy... 😚
+
+Windows Master Updater & Cleaner
+...
+```
+
+OR
+
+## Run the installer again.
 
 ## Linux
 
@@ -211,6 +232,7 @@ terminal-shortcuts/
 │   │   ├── update
 │   │   ├── cleaner
 │   │   ├── repair
+│   │   ├── check_os
 │   │   └── ...
 │   │
 │   ├── macos/
@@ -222,15 +244,19 @@ terminal-shortcuts/
 │   └── windows/
 │       ├── update.ps1
 │       ├── cleaner.ps1
+│       ├── repair.ps1
 │       └── ...
 │
 ├── install/
 │   ├── install-linux.sh
 │   ├── install-macos.sh
 │   ├── install-windows.ps1
+│   ├── update-terminal-shortcuts.sh
+│   ├── update-terminal-shortcuts.ps1
 │   ├── uninstall.sh
 │   └── uninstall-windows.ps1
 │
+├── version
 ├── README.md
 ├── LICENSE
 └── .gitignore
