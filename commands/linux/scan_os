@@ -1,0 +1,209 @@
+scan_os() {
+    # Define colors for output
+    local RED="\e[31m"
+    local GREEN="\e[32m"
+    local RESET="\e[0m"
+
+    # Helper function to print table rows
+    print_row() {
+        local check="$1"
+        local target="$2"
+        local score="$3"
+        local status="$4"
+        local note="$5"
+        
+        # Set color based on status (Green for PASS, Red for WARN/FAIL)
+        local color="$RESET"
+        if [[ "$status" == "PASS" ]]; then
+            color="$GREEN"
+        else
+            color="$RED"
+        fi
+        
+        local status_note="[${status}] ${note}"
+        
+        # Print the 4 columns
+        printf "%-15s | %-15s | %-8s | ${color}%s${RESET}\n" \
+            "$check" "$target" "${score}/10" "$status_note"
+    }
+
+    # Print table header
+    echo
+    printf "%-15s | %-15s | %-8s | %s\n" "CHECK" "TARGET" "SCORE" "STATUS & NOTES"
+    printf "%-15s-+-%-15s-+-%-8s-+-%s\n" "---------------" "---------------" "--------" "--------------------------------"
+
+    # Initialize total score
+    local total_score=0
+    local max_checks=14
+    local max_score=$((max_checks * 10))
+
+    # Detect Package Manager
+    local pkg_mgr="unknown"
+    if command -v dnf >/dev/null 2>&1; then pkg_mgr="dnf"
+    elif command -v apt >/dev/null 2>&1; then pkg_mgr="apt"
+    elif command -v pacman >/dev/null 2>&1; then pkg_mgr="pacman"
+    fi
+
+    # 1. Package Updates
+    local p_status="PASS" p_score=10 p_note="Repositories reachable"
+    case "$pkg_mgr" in
+        dnf) sudo dnf check-update -q >/dev/null 2>&1 || { p_status="WARN"; p_score=5; p_note="Updates available or error"; } ;;
+        apt) sudo apt update -qq >/dev/null 2>&1 || { p_status="WARN"; p_score=5; p_note="Unable to update lists"; } ;;
+        pacman) sudo pacman -Sy --noconfirm >/dev/null 2>&1 || { p_status="WARN"; p_score=5; p_note="Sync failed"; } ;;
+        *) p_status="WARN"; p_score=5; p_note="Unknown package manager" ;;
+    esac
+    total_score=$((total_score + p_score))
+    print_row "Packages" "$pkg_mgr" "$p_score" "$p_status" "$p_note"
+
+    # 2. Broken Packages
+    local b_status="PASS" b_score=10 b_note="No broken packages"
+    case "$pkg_mgr" in
+        dnf) sudo dnf repoquery --unsatisfied 2>/dev/null | grep -q . && { b_status="FAIL"; b_score=0; b_note="Run dnf repair"; } ;;
+        apt) sudo dpkg --audit 2>/dev/null | grep -q . && { b_status="FAIL"; b_score=0; b_note="Run apt --fix-broken"; } ;;
+        pacman) sudo pacman -Qk 2>/dev/null | grep -q warning && { b_status="FAIL"; b_score=0; b_note="Run pacman repair"; } ;;
+    esac
+    total_score=$((total_score + b_score))
+    print_row "Broken Pkgs" "$pkg_mgr" "$b_score" "$b_status" "$b_note"
+
+    # 3. Internet Connection
+    local i_status="PASS" i_score=10 i_note="Connection OK"
+    if ! ping -c1 -W2 8.8.8.8 >/dev/null 2>&1; then
+        i_status="FAIL"; i_score=0; i_note="Check network cable or WiFi"
+    fi
+    total_score=$((total_score + i_score))
+    print_row "Internet" "8.8.8.8" "$i_score" "$i_status" "$i_note"
+
+    # 4. Disk Usage
+    local usage=$(df / | awk 'END{gsub("%","");print $5}')
+    local d_status="PASS" d_score=10 d_note="Usage: ${usage}%"
+    if (( usage >= 90 )); then
+        d_status="FAIL"; d_score=0; d_note="Critical: Free up space"
+    elif (( usage >= 80 )); then
+        d_status="WARN"; d_score=5; d_note="High usage: ${usage}%"
+    fi
+    total_score=$((total_score + d_score))
+    print_row "Disk Usage" "/" "$d_score" "$d_status" "$d_note"
+
+    # 5. SMART Health
+    local disk_dev=$(lsblk -dn -o NAME,TYPE 2>/dev/null | awk '$2=="disk"{print $1;exit}')
+    local s_status="PASS" s_score=10 s_note="Disk health OK"
+    if command -v smartctl >/dev/null 2>&1; then
+        if ! sudo smartctl -H "/dev/$disk_dev" 2>/dev/null | grep -q PASSED; then
+            s_status="FAIL"; s_score=0; s_note="Backup immediately"
+        fi
+    else
+        s_note="smartctl not installed"
+    fi
+    total_score=$((total_score + s_score))
+    print_row "SMART" "/dev/$disk_dev" "$s_score" "$s_status" "$s_note"
+
+    # 6. CPU Temperature
+    local t_status="PASS" t_score=10 t_note="Temp normal"
+    if command -v sensors >/dev/null 2>&1; then
+        local temp=$(sensors 2>/dev/null | awk '/Package id 0:/{gsub("\\+|°C","",$4); print int($4); exit} /Tctl:/{gsub("\\+|°C","",$2); print int($2); exit}')
+        if [[ -n "$temp" ]]; then
+            t_note="Temp: ${temp}C"
+            if (( temp >= 90 )); then
+                t_status="FAIL"; t_score=0; t_note="Critical: ${temp}C"
+            elif (( temp >= 80 )); then
+                t_status="WARN"; t_score=5; t_note="High: ${temp}C"
+            fi
+        else
+            t_note="Sensor not available"
+        fi
+    else
+        t_note="lm-sensors not installed"
+    fi
+    total_score=$((total_score + t_score))
+    print_row "CPU Temp" "CPU" "$t_score" "$t_status" "$t_note"
+
+    # 7. Swap Status
+    local sw_status="PASS" sw_score=10 sw_note="Swap is active"
+    if ! swapon --show 2>/dev/null | grep -q .; then
+        sw_status="WARN"; sw_score=5; sw_note="No active swap"
+    fi
+    total_score=$((total_score + sw_score))
+    print_row "Swap" "Memory" "$sw_score" "$sw_status" "$sw_note"
+
+    # 8. Failed Services
+    local svc_status="PASS" svc_score=10 svc_note="No failed services"
+    if systemctl --failed --no-legend 2>/dev/null | grep -q .; then
+        svc_status="FAIL"; svc_score=0; svc_note="Check systemctl --failed"
+    fi
+    total_score=$((total_score + svc_score))
+    print_row "Services" "systemd" "$svc_score" "$svc_status" "$svc_note"
+
+    # 9. BIOS / ACPI
+    local a_status="PASS" a_score=10 a_note="No ACPI errors"
+    if dmesg 2>/dev/null | grep -Eiq "ACPI BIOS Error|Firmware Bug|AE_AML"; then
+        a_status="WARN"; a_score=5; a_note="Update BIOS"
+    fi
+    total_score=$((total_score + a_score))
+    print_row "BIOS/ACPI" "dmesg" "$a_score" "$a_status" "$a_note"
+
+    # 10. Wireless Driver
+    local w_status="PASS" w_score=10 w_note="Open source driver"
+    if lsmod 2>/dev/null | grep -q "^wl"; then
+        w_status="WARN"; w_score=5; w_note="Proprietary driver"
+    elif ! lsmod 2>/dev/null | grep -Eq "^iwlwifi|^ath|^brcm"; then
+        w_note="No wireless or unknown"
+    fi
+    total_score=$((total_score + w_score))
+    print_row "Wireless" "lsmod" "$w_score" "$w_status" "$w_note"
+
+    # 11. Kernel Errors
+    local k_status="PASS" k_score=10 k_note="No kernel errors"
+    if journalctl -k -p err -b --no-pager 2>/dev/null | grep -q .; then
+        k_status="WARN"; k_score=5; k_note="Check dmesg or journalctl"
+    fi
+    total_score=$((total_score + k_score))
+    print_row "Kernel" "journalctl" "$k_score" "$k_status" "$k_note"
+
+    # 12. Filesystem Errors
+    local f_status="PASS" f_score=10 f_note="Filesystem OK"
+    if dmesg 2>/dev/null | grep -Eiq "EXT4-fs error|BTRFS error|XFS error|I/O error"; then
+        f_status="FAIL"; f_score=0; f_note="Run fsck immediately"
+    fi
+    total_score=$((total_score + f_score))
+    print_row "Filesystem" "dmesg/fsck" "$f_score" "$f_status" "$f_note"
+
+    # 13. SSD Lifetime
+    local ssd_status="PASS" ssd_score=10 ssd_note="Lifetime OK"
+    if command -v smartctl >/dev/null 2>&1; then
+        local life=$(sudo smartctl -a "/dev/$disk_dev" 2>/dev/null | awk -F':' '/Percentage Used/{gsub(/ /,"",$2); print $2; exit}')
+        if [[ -n "$life" ]]; then
+            ssd_note="Used: ${life}"
+            local life_num=${life%\%}
+            if (( life_num >= 90 )); then
+                ssd_status="FAIL"; ssd_score=0; ssd_note="Critical: ${life}"
+            elif (( life_num >= 70 )); then
+                ssd_status="WARN"; ssd_score=5; ssd_note="High wear: ${life}"
+            fi
+        else
+            ssd_note="Info unavailable"
+        fi
+    else
+        ssd_note="smartctl not installed"
+    fi
+    total_score=$((total_score + ssd_score))
+    print_row "SSD Life" "/dev/$disk_dev" "$ssd_score" "$ssd_status" "$ssd_note"
+
+    # 14. SELinux
+    local se_status="PASS" se_score=10 se_note="SELinux OK"
+    if command -v getenforce >/dev/null 2>&1; then
+        local mode=$(getenforce 2>/dev/null)
+        se_note="Mode: $mode"
+        if [[ "$mode" != "Enforcing" ]]; then
+            se_status="WARN"; se_score=5; se_note="Not enforcing: $mode"
+        fi
+    else
+        se_note="Not installed"
+    fi
+    total_score=$((total_score + se_score))
+    print_row "SELinux" "Security" "$se_score" "$se_status" "$se_note"
+
+    # Print Final Score
+    echo
+    printf "%-15s | %-15s | %-8s | %s\n" "TOTAL SCORE" "System" "${total_score}/${max_score}" "Health Check Completed"
+    echo
+}
