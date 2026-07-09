@@ -59,6 +59,16 @@ powershell -ExecutionPolicy Bypass -File "$($_.FullName)" %*
 
 }
 
+@"
+@echo off
+powershell -ExecutionPolicy Bypass -File "$InstallDir\install\update-terminal-shortcuts.ps1" %*
+"@ | Set-Content "$BinDir\update-terminal-shortcuts.cmd"
+
+Copy-Item `
+"$InstallDir\install\update-terminal-shortcuts.ps1" `
+"$BinDir\update-terminal-shortcuts.ps1" `
+-Force
+
 # --------------------------------------------------
 # Finish
 # --------------------------------------------------
