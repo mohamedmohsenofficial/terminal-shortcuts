@@ -1,14 +1,14 @@
-#!/usr/bin/env bash
-
 # --------------------------------------------------
 # Update Terminal Shortcuts
 # --------------------------------------------------
 
+echo "Running some updates to keep Terminal Shortcuts healthy... 😚"
+
 if command -v update-terminal-shortcuts >/dev/null 2>&1; then
-    echo "Running some updates to keep Terminal Shortcuts healthy... 😚"
-    update-terminal-shortcuts
-    echo
+    update-terminal-shortcuts >/dev/null 2>&1 || true
 fi
+
+echo
 
 # --------------------------------------------------
 # Your Update Script Starts Here
@@ -22,9 +22,6 @@ CYAN='\033[1;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-echo "Running some updates to keep Terminal Shortcuts healthy... 😚"
-update-terminal-shortcuts >/dev/null 2>&1 || true
-echo
 
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}[ERROR] Please run this script as root (using sudo)${NC}\n"
